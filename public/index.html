@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EliteOdds Board v3.13.7</title>
+  <title>EliteOdds Board v3.13.8</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -2486,6 +2486,15 @@
        EliteOdds BOARD PRODUCT — desktop staple (mockup #2)
        Not a theme: this IS the app chrome on desktop
        ========================================================= */
+    
+    /* Hide top market controls on board product */
+    body.eo-board-product #dash-market,
+    body.eo-board-product label[style*="MARKET"],
+    body.eo-board-product .dash-top [data-role="market"],
+    body.eo-board-product select#sc-market,
+    body.eo-board-product select#m-market,
+    body.eo-board-product select#market-select { display: none !important; }
+
     body.eo-board-product {
       background: #070b12 !important;
       color: #d1d9e6;
@@ -4552,6 +4561,122 @@
   </nav>
 <script>
 (function () {
+
+  // ===== Board helpers (must exist before any loadGames / render) =====
+  function propStatLabel(g) {
+    var mt = String((g && (g.marketType || g.sportsMarketType)) || '').toLowerCase();
+    var q = String((g && (g.question || g.title || g.eventTitle || g.modelPick || g.pick)) || '').toLowerCase();
+    var map = {
+      player_pts: 'Points', player_reb: 'Rebounds', player_ast: 'Assists', player_pra: 'Pts+Reb+Ast',
+      player_threes: '3-Pointers', player_blocks: 'Blocks', player_blk: 'Blocks', player_steals: 'Steals',
+      player_goals: 'Goals', player_saves: 'Saves', player_shots: 'Shots', player_k: 'Strikeouts',
+      player_hr: 'Home Runs', player_hits: 'Hits', player_rbi: 'RBIs', player_runs: 'Runs',
+      player_pass_yds: 'Pass Yds', player_rush_yds: 'Rush Yds', player_rec_yds: 'Rec Yds',
+      player_receptions: 'Receptions', player_atd: 'Anytime TD'
+    };
+    if (map[mt]) return map[mt];
+    if (/goal/.test(q) && !/field goal/.test(q)) return 'Goals';
+    if (/shot/.test(q)) return 'Shots';
+    if (/\bpoints?\b/.test(q) && !/spread|moneyline/.test(q)) return 'Points';
+    if (/assist/.test(q)) return 'Assists';
+    if (/rebound/.test(q)) return 'Rebounds';
+    if (/strikeout/.test(q)) return 'Strikeouts';
+    if (/touchdown|\btd\b/.test(q)) return 'TDs';
+    return 'Prop';
+  }
+  function formatPropPick(g) {
+    var raw = String((g && (g.modelPick || g.pick || g.pickName || g.side)) || '—').trim();
+    var stat = propStatLabel(g);
+    var mPlus = raw.match(/^(.+?)\s+(\d+)\+\s*$/);
+    if (mPlus) return mPlus[1].trim() + ' · ' + mPlus[2] + '+ ' + stat;
+    var mOu = raw.match(/^(.+?)\s+(over|under)\s+([\d.]+)\s*$/i);
+    if (mOu) return mOu[1].trim() + ' · ' + mOu[2].charAt(0).toUpperCase() + mOu[2].slice(1).toLowerCase() + ' ' + mOu[3] + ' ' + stat;
+    if (stat !== 'Prop' && raw.toLowerCase().indexOf(stat.toLowerCase()) < 0) return raw + ' · ' + stat;
+    return raw;
+  }
+  function boardMarket(g) {
+    if (!g) return '—';
+    var mt = String(g.marketType || g.market || 'ML');
+    if (/player|prop|pitcher|batter/i.test(mt) || g.playerProp || g.propPlayer) {
+      var st = propStatLabel(g);
+      return st === 'Prop' ? 'Player prop' : ('Player · ' + st);
+    }
+    if (/money|ml|winner/i.test(mt) && !/spread|total/i.test(mt)) return 'Moneyline';
+    if (/spread/i.test(mt)) {
+      var pick = String(g.modelPick || g.pick || '');
+      var pm = pick.match(/([+-]?\d+(?:\.\d+)?)\s*$/);
+      var sl = pm ? Math.abs(Number(pm[1])) : (g.spreadLine != null ? g.spreadLine : g.line);
+      return 'Spread' + (sl != null && sl !== '' && !isNaN(Number(sl)) ? ' ' + Math.abs(Number(sl)) : '');
+    }
+    if (/team.?total/i.test(mt)) {
+      var tl = g.totalLine != null ? g.totalLine : g.line;
+      return 'Team total' + (tl != null && tl !== '' ? ' ' + tl : '');
+    }
+    if (/total|ou|over|under/i.test(mt)) {
+      var t2 = g.totalLine != null ? g.totalLine : g.line;
+      return 'Total' + (t2 != null && t2 !== '' ? ' ' + t2 : '');
+    }
+    if (/nrfi|yrfi/i.test(mt)) return String(mt).toUpperCase();
+    return mt;
+  }
+  function boardPick(g) {
+    if (!g) return '—';
+    var mt = String(g.marketType || '').toLowerCase();
+    if (/player|prop|pitcher|batter/i.test(mt) || g.playerProp || g.propPlayer) return formatPropPick(g);
+    var p = String(g.modelPick || g.pick || g.pickName || g.pickHint || g.side || '—').trim();
+    p = p.replace(/\bNew York G\b/gi, 'New York Giants').replace(/\bNew York J\b/gi, 'New York Jets');
+    p = p.replace(/([+-]?\d+(?:\.\d+)?)\s+\1\b/g, '$1').replace(/\s{2,}/g, ' ').trim();
+    return p || '—';
+  }
+  function boardPct(v) {
+    if (v == null || v === '' || isNaN(Number(v))) return '—';
+    var n = Number(v);
+    if (n <= 1.5 && n >= 0) n = n * 100;
+    return (Math.round(n * 10) / 10) + '%';
+  }
+  function boardEdge(g) {
+    function toPct(v) {
+      if (v == null || v === '' || isNaN(Number(v))) return null;
+      var n = Number(v);
+      if (n <= 1.5 && n >= 0) n = n * 100;
+      return n;
+    }
+    var mkt = toPct(g && (g.market_probability != null ? g.market_probability : (g.mktPct != null ? g.mktPct : g.yesPrice)));
+    var mod = toPct(g && (g.model_probability != null ? g.model_probability : (g.fair != null ? g.fair : g.modelPct)));
+    var n = (mkt != null && mod != null) ? (mod - mkt) : null;
+    if (n == null && g && g.edgePp != null && !isNaN(Number(g.edgePp))) n = Number(g.edgePp);
+    if (n == null || isNaN(n)) return { t: '—', c: 'eo-edge-zero' };
+    if (Math.abs(n) > 25) n = (mkt != null && mod != null) ? Math.max(-25, Math.min(25, mod - mkt)) : 0;
+    n = Math.round(n * 10) / 10;
+    return { t: (n >= 0 ? '+' : '') + n + 'pp', c: n > 2 ? 'eo-edge-pos' : (n < -2 ? 'eo-edge-neg' : 'eo-edge-zero') };
+  }
+  function boardMatchup(g) {
+    if (!g) return '—';
+    var title = '';
+    try {
+      if (typeof cleanBoardTitle === 'function') title = cleanBoardTitle(g) || '';
+    } catch (e0) {}
+    if (!title || title === '—') {
+      var a = g.away || g.awayTeam || '';
+      var h = g.home || g.homeTeam || '';
+      title = (a && h) ? (a + ' vs ' + h) : String(g.eventTitle || g.title || g.question || '—');
+    }
+    title = String(title).replace(/\bNew York G\b/gi, 'New York Giants').replace(/\bNew York J\b/gi, 'New York Jets');
+    var lg = String(g.league || '').toUpperCase();
+    var sub = g.live ? (lg ? lg + ' · LIVE' : 'LIVE') : lg;
+    return '<div>' + (typeof escapeHtml === 'function' ? escapeHtml(title) : title) + '</div>' +
+      (sub ? '<div class="sub">' + (typeof escapeHtml === 'function' ? escapeHtml(sub) : sub) + '</div>' : '');
+  }
+  // Expose for any external/onclick path
+  try {
+    window.boardMarket = boardMarket;
+    window.boardPick = boardPick;
+    window.boardEdge = boardEdge;
+    window.boardMatchup = boardMatchup;
+    window.boardPct = boardPct;
+  } catch (eW) {}
+  // ===== end board helpers =====
+
   var SPORTS = [
     { id: 'mlb', label: 'MLB' },
     { id: 'nfl', label: 'NFL' },
@@ -4805,7 +4930,7 @@
   };
 
   
-  var APP_VERSION = '3.13.7';
+  var APP_VERSION = '3.13.8';
   var APP_CHANGELOG = [
     {
       version: '3.13.5',
@@ -10899,10 +11024,13 @@ function kalQuery(mt, strict, allowMkt) {
   }
 
   function boardMarketFilter(list) {
+    return list || []; // market pill removed
+    // Top market pill removed — always show all market types on the board
+    return list || [];
     var mk = selectedDashValues('dash-market');
     if (!mk.length || mk.indexOf('all') >= 0) return list;
     return (list || []).filter(function (g) {
-      var m = String(g.marketType || g.market || g.category || boardMarket(g) || '').toLowerCase();
+      var m = String(g.marketType || g.market || g.category || '').toLowerCase();
       for (var i = 0; i < mk.length; i++) {
         var k = mk[i];
         if (k === 'bucket_ml' && /ml|moneyline|winner|1h win|2h win|f5 win|match/.test(m)) return true;
@@ -15329,6 +15457,7 @@ function renderSlate() {
     });
   }
   function boardMarketFilter(list) {
+    return list || []; // market pill removed
     var mk = selectedDashValues('dash-market');
     if (!mk.length || mk.indexOf('all') >= 0) return list;
     return (list || []).filter(function (g) {
