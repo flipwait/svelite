@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EliteOdds Board 3.16.3</title>
+  <title>EliteOdds Board 3.16.4</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -5013,7 +5013,7 @@
   };
 
   
-  var APP_VERSION = '3.16.3';
+  var APP_VERSION = '3.16.4';
   var APP_CHANGELOG = [
     {
       version: '3.13.5',
@@ -6692,11 +6692,23 @@
         if (pmOk(g.url) && /\/market\//i.test(g.url)) return g.url;
       }
     }
+    // Always prefer event page when we have eventSlug (correct game page)
+    var evSlug = g.eventSlug || null;
+    if (!evSlug && g.url && /\/event\/([^/?#]+)/i.test(String(g.url))) {
+      evSlug = String(g.url).match(/\/event\/([^/?#]+)/i)[1];
+    }
+    // Avoid using bare market slug as event when it looks like a line market
+    var mSlug = g.marketSlug || null;
+    if (evSlug) {
+      var href = 'https://polymarket.us/event/' + encodeURIComponent(evSlug);
+      if (mSlug && mSlug !== evSlug) href += '?market=' + encodeURIComponent(mSlug);
+      return href;
+    }
     if (pmOk(g.eventUrl)) return g.eventUrl;
-    if (g.eventSlug) return 'https://polymarket.us/event/' + encodeURIComponent(g.eventSlug);
-    if (pmOk(g.url)) return g.url;
+    if (pmOk(g.url) && /\/event\//i.test(String(g.url))) return g.url;
+    if (mSlug) return 'https://polymarket.us/market/' + encodeURIComponent(mSlug);
     if (pmOk(g.marketUrl)) return g.marketUrl;
-    if (g.marketSlug) return 'https://polymarket.us/market/' + encodeURIComponent(g.marketSlug);
+    if (pmOk(g.url)) return g.url;
     return 'https://polymarket.us';
   }
 
@@ -11253,7 +11265,7 @@ function kalQuery(mt, strict, allowMkt) {
   }
 
   function boardLiveCell(g) {
-    if (g.live) return '<span class="live-pill">LIVE</span>';
+    if (g.live) return '<button type="button" class="live-pill live-pill-btn" data-live-focus="1" title="Open Live Focus">LIVE</button>';
     return '<span class="live-off">—</span>';
   }
 
@@ -11481,6 +11493,26 @@ function kalQuery(mt, strict, allowMkt) {
     }, 45000);
   }
   window.openLiveFocus = openLiveFocus;
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t) return;
+    if (t.getAttribute && t.getAttribute('data-live-focus')) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      var tr = t.closest('tr');
+      var card = t.closest('.m-card');
+      var list = window.__lastBoardGames || [];
+      var g = null;
+      if (tr && tr.getAttribute('data-idx') != null) g = list[Number(tr.getAttribute('data-idx'))];
+      if (!g && card && card.getAttribute('data-idx') != null) g = list[Number(card.getAttribute('data-idx'))];
+      if (!g && tr) {
+        var gid = tr.getAttribute('data-gid');
+        if (gid) g = list.filter(function (x) { return String(x.id || x.marketSlug || '') === gid; })[0];
+      }
+      if (g) openLiveFocus(g);
+      return;
+    }
+  }, true);
   window.closeLiveFocus = closeLiveFocus;
   document.addEventListener('click', function (ev) {
     if (ev.target && (ev.target.id === 'lf-close' || ev.target.id === 'live-focus-overlay')) {
@@ -11497,7 +11529,7 @@ function kalQuery(mt, strict, allowMkt) {
       host.innerHTML = '<div class="m-card" style="text-align:center;color:#94a3b8">No markets yet — scan or auto-refresh.</div>';
       return;
     }
-    host.innerHTML = list.slice(0, 80).map(function (g) {
+    host.innerHTML = list.slice(0, 80).map(function (g, idx) {
       var match = '';
       try { match = boardMatchup(g); } catch (e) { match = g.eventTitle || g.title || '—'; }
       var pick = g.modelPick || g.pick || '—';
@@ -11519,7 +11551,7 @@ function kalQuery(mt, strict, allowMkt) {
       var href = '#';
       try { href = tradeHrefFor(g); } catch (e4) {}
       var id = escapeHtml(String(g.id || g.marketSlug || Math.random()));
-      return '<div class="m-card" data-gid="' + id + '">' +
+      return '<div class="m-card" data-gid="' + id + '" data-idx="' + idx + '">' +
         '<div class="m-card-top"><div><div class="m-card-match">' + escapeHtml(match) + '</div>' +
         '<div class="m-card-meta">' + live + ' ' + escapeHtml(String(g.league || '').toUpperCase()) + ' · ' + escapeHtml(String(g.marketType || '')) + ' · ' + escapeHtml(String(pick)) + '</div></div>' +
         '<div>' + rankHtml + '</div></div>' +
@@ -11689,6 +11721,16 @@ function renderBoardTable(list) {
         '<td>' + boardLiveCell(g) + '</td>' +
         '</tr>';
     });
+    try {
+      var tmp = document.createElement('tbody');
+      tmp.innerHTML = html;
+      var rws = tmp.querySelectorAll('tr');
+      for (var ri = 0; ri < rws.length; ri++) {
+        rws[ri].setAttribute('data-idx', String(ri));
+        if (list[ri]) rws[ri].setAttribute('data-gid', String(list[ri].id || list[ri].marketSlug || ''));
+      }
+      html = tmp.innerHTML;
+    } catch (eTag) {}
     tb.innerHTML = html;
     try { renderBoardMobileCards(list); } catch (eMob) {}
     if (meta) {
@@ -11756,6 +11798,34 @@ function renderBoardTable(list) {
     if (g.oddsConsensus && g.oddsConsensus.noVigHome != null) {
       insights.push('<b>No-vig books:</b> Home ' + g.oddsConsensus.noVigHome + '% · Away ' + g.oddsConsensus.noVigAway + '%');
     }
+    // Richer pick explanation
+    try {
+      var mktP = mktPctOf(g); var modP = modelPctOf(g); var ed = boardEdge(g);
+      insights.push('<b>Why this pick:</b> Model fair ' + boardPct(modP) + ' vs market ' + boardPct(mktP) +
+        (ed != null ? (' → edge ' + (Number(ed) > 0 ? '+' : '') + (Math.round(Number(ed)*10)/10) + 'pp') : ''));
+    } catch (eW) {}
+    if (g.formQuality) {
+      insights.push('<b>Form quality:</b> ' + escapeHtml(String(g.formQuality).toUpperCase()) +
+        (g.formPriorSeason ? ' (prior-season backfill)' : ''));
+    }
+    if (g.ev != null || g.netEv != null || (g.evaluate && g.evaluate.realEv && g.evaluate.realEv.evPct != null)) {
+      var evv = g.netEv != null ? g.netEv : (g.ev != null ? g.ev : g.evaluate.realEv.evPct);
+      insights.push('<b>Net EV:</b> ' + (Math.round(Number(evv) * 10) / 10) + '% of stake (approx)');
+    }
+    if (g.sides && g.sides.length) {
+      insights.push('<b>Sides:</b> ' + g.sides.map(function (sd) {
+        return escapeHtml(String(sd.name || '')) + (sd.pct != null ? (' ' + sd.pct + '%') : '');
+      }).join(' · '));
+    }
+    if (g.rank === 'Pass') {
+      insights.push('<b>Why Pass:</b> Edge/EV below Good gates, longshot price floor, thin form + strict gate, or model/market not separated enough. Large display edges can still Pass if EV or form quality fails.');
+    }
+    if (g.eventSlug || g.marketSlug || g.slug) {
+      insights.push('<b>Slugs:</b> event ' + escapeHtml(String(g.eventSlug || '—')) + ' · market ' + escapeHtml(String(g.marketSlug || g.slug || '—')));
+    }
+    if (g.score || g.period) {
+      insights.push('<b>Live board:</b> ' + escapeHtml(String(g.score || '')) + ' ' + escapeHtml(String(g.period || '')));
+    }
     var body = el.querySelector('.bd-panel-body') || el;
     body.innerHTML =
       '<div class="bd-match">' + escapeHtml(title) +
@@ -11779,6 +11849,7 @@ function renderBoardTable(list) {
         '<button type="button" data-bd-act="combo">+ Combo</button>' +
         '<button type="button" data-bd-act="log">Log</button>' +
         '<button type="button" data-bd-act="share">Share</button>' +
+        (g.live ? '<button type="button" data-bd-act="livefocus" class="pri">Live Focus</button>' : '') +
       '</div>';
     el.setAttribute('data-gid', g.id || g.slug || '');
   }
@@ -11803,6 +11874,7 @@ function renderBoardTable(list) {
       var gg = (window.__lastBoardGames || []).filter(function (x) { return String(x.id || x.slug) === String(gid); })[0];
       if (!gg) return;
       if (act === 'combo' && typeof addToCombo === 'function') addToCombo(gg);
+      if (act === 'livefocus') { openLiveFocus(gg); return; }
       else if (act === 'log' && typeof logBet === 'function') logBet(gg);
       else if (act === 'share') {
         var text = (gg.eventTitle || gg.title || '') + ' · ' + boardPick(gg) + ' · ' + (gg.rank || '');
