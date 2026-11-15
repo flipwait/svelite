@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EliteOdds Board 3.16.1</title>
+  <title>EliteOdds Board 3.16.2</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -3200,7 +3200,40 @@
       overflow: auto !important;
     }
 
-  </style>
+  
+/* —— Mobile readability (board + scanner) —— */
+@media (max-width: 900px) {
+  body.layout-board .eo-board-shell,
+  .eo-board-shell { padding: 8px 8px 72px; }
+  .eo-board-header { flex-wrap: wrap; gap: 8px; padding: 8px; }
+  .eo-board-header select,
+  .eo-board-header .pill,
+  .dash-top select { font-size: 13px !important; min-height: 36px; }
+  .eo-board-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; }
+  table.eo-board-table { min-width: 720px; font-size: 12px; }
+  table.eo-board-table th { font-size: 10px; padding: 8px 6px; white-space: nowrap; }
+  table.eo-board-table td { padding: 10px 6px; vertical-align: top; }
+  table.eo-board-table td:nth-child(2) { min-width: 120px; font-weight: 600; }
+  .eo-rank-pill { font-size: 10px; padding: 3px 6px; }
+  .eo-form-strong, .eo-form-thin, .eo-form-none { display: block; margin-left: 0; margin-top: 4px; font-size: 9px; }
+  .eo-board-detail, #board-detail, .game-detail {
+    position: fixed; left: 0; right: 0; bottom: 0; max-height: 55vh;
+    overflow-y: auto; z-index: 80; border-radius: 16px 16px 0 0;
+    padding: 14px 14px 24px; box-shadow: 0 -8px 32px rgba(0,0,0,.45);
+  }
+  .eo-gcard, .gcard, .game-card {
+    padding: 12px; border-radius: 14px; margin-bottom: 10px;
+  }
+  .eo-gcard .actions, .gcard-actions, .game-card button {
+    min-height: 40px; font-size: 13px;
+  }
+  /* Hide densest columns on very small screens if marked */
+  @media (max-width: 480px) {
+    table.eo-board-table .col-hide-xs { display: none; }
+  }
+}
+
+</style>
 </head>
 <body class="v3 layout-board eo-board-product">
   <div class="flex min-h-screen">
@@ -4933,7 +4966,7 @@
   };
 
   
-  var APP_VERSION = '3.16.1';
+  var APP_VERSION = '3.16.2';
   var APP_CHANGELOG = [
     {
       version: '3.13.5',
@@ -11662,7 +11695,7 @@ function renderBoardTable(list) {
         sport = lg;
         try {
           if (ven === 'kalshi') {
-            data = await fetchJsonTimeout(kalQuery('all', '0', true), 16000);
+            data = await fetchJsonTimeout(kalQuery('all', '0', true), 45000);
           } else {
             // marketType=all, rank elite, allow market-only false → more complete board
             data = await fetchJsonTimeout(polyQuery('all', 'elite', 0, 0, 0, '0', true, lg), 18000);
