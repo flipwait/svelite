@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EliteOdds Board 3.16.2</title>
+  <title>EliteOdds Board 3.16.3</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -3233,6 +3233,53 @@
   }
 }
 
+
+/* Live Focus */
+.lf-overlay{position:fixed;inset:0;z-index:200;background:rgba(2,6,14,.72);display:flex;align-items:flex-end;justify-content:center;padding:0}
+.lf-overlay.hidden{display:none}
+.lf-sheet{width:100%;max-width:560px;max-height:92vh;overflow:auto;background:#0b1220;border:1px solid #243047;border-radius:18px 18px 0 0;padding:16px 16px 28px;box-shadow:0 -12px 40px rgba(0,0,0,.5)}
+@media(min-width:900px){.lf-overlay{align-items:center;padding:24px}.lf-sheet{border-radius:18px;max-height:85vh}}
+.lf-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+.lf-kicker{font-size:10px;letter-spacing:.12em;color:#a78bfa;font-weight:700}
+.lf-title{font-size:18px;font-weight:700;color:#f1f5f9;line-height:1.25}
+.lf-sub{font-size:12px;color:#94a3b8;margin-top:4px}
+.lf-close{background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:10px;width:40px;height:40px;font-size:16px;cursor:pointer}
+.lf-score-row{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:12px 0;padding:12px;border-radius:12px;background:#111827;border:1px solid #1f2a3d}
+.lf-score{font-size:28px;font-weight:800;color:#f8fafc}
+.lf-period{font-size:13px;color:#a78bfa;font-weight:600}
+.lf-clock{font-size:12px;color:#94a3b8;margin-left:auto}
+.lf-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.lf-metric{background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:10px}
+.lf-metric b{display:block;font-size:10px;color:#64748b;letter-spacing:.06em}
+.lf-metric span{font-size:15px;font-weight:700;color:#e2e8f0}
+.lf-edge-box{padding:12px;border-radius:12px;border:1px solid #312e81;background:linear-gradient(135deg,#1e1b4b,#0f172a);margin-bottom:12px;color:#c7d2fe;font-size:13px;line-height:1.45}
+.lf-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.lf-actions a,.lf-actions button{flex:1 1 120px;min-height:42px;border-radius:10px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:13px;font-weight:600;cursor:pointer;text-align:center;padding:10px;text-decoration:none}
+.lf-actions a.primary,.lf-actions button.primary{background:#6d28d9;border-color:#7c3aed}
+.lf-related-list{display:flex;flex-direction:column;gap:8px}
+.lf-rel{padding:10px;border-radius:10px;background:#0f172a;border:1px solid #1e293b;font-size:12px;color:#cbd5e1}
+.lf-rel strong{color:#f8fafc}
+.lf-note{font-size:11px;color:#64748b;margin-top:12px;line-height:1.4}
+
+/* Mobile board = cards */
+@media (max-width: 900px) {
+  .eo-board-table-wrap { display: none !important; }
+  #board-cards-mobile { display: flex !important; flex-direction: column; gap: 10px; padding: 8px 4px 80px; }
+  .m-card{background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:12px 14px}
+  .m-card-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+  .m-card-match{font-size:14px;font-weight:700;color:#f1f5f9;line-height:1.3}
+  .m-card-meta{font-size:11px;color:#94a3b8;margin-top:4px}
+  .m-card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
+  .m-card-grid div{background:#111827;border-radius:8px;padding:8px;text-align:center}
+  .m-card-grid b{display:block;font-size:9px;color:#64748b}
+  .m-card-grid span{font-size:13px;font-weight:700;color:#e2e8f0}
+  .m-card-actions{display:flex;flex-wrap:wrap;gap:6px}
+  .m-card-actions button,.m-card-actions a{flex:1 1 30%;min-height:38px;border-radius:9px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:12px;font-weight:600;text-align:center;padding:8px;text-decoration:none}
+}
+@media (min-width: 901px) {
+  #board-cards-mobile { display: none !important; }
+}
+
 </style>
 </head>
 <body class="v3 layout-board eo-board-product">
@@ -3570,7 +3617,7 @@
             </div>
             <p style="margin:8px 0 0;font-size:10px;color:#8b93a7">Enable auto in Settings → Auto-Trade. This tab only surfaces candidates that match these gates.</p>
           </div>
-          <div id="live-focus-bar">
+          <div id="live-focus-bar" style="display:none">
             <strong>Live Focus</strong> — live games only. Watch score, price, and residual edge while the game is on.
             <div class="lf-grid">
               <label>Sport
@@ -4966,7 +5013,7 @@
   };
 
   
-  var APP_VERSION = '3.16.2';
+  var APP_VERSION = '3.16.3';
   var APP_CHANGELOG = [
     {
       version: '3.13.5',
@@ -11309,6 +11356,196 @@ function kalQuery(mt, strict, allowMkt) {
   }
 
 
+  
+  var __lfTimer = null;
+  var __lfGame = null;
+  function closeLiveFocus() {
+    try {
+      if (__lfTimer) { clearInterval(__lfTimer); __lfTimer = null; }
+      __lfGame = null;
+      var ov = $('live-focus-overlay');
+      if (ov) { ov.classList.add('hidden'); ov.setAttribute('aria-hidden', 'true'); }
+    } catch (e) {}
+  }
+  function liveFocusMetricsHtml(g) {
+    function pct(v) {
+      if (v == null || !isFinite(Number(v))) return '—';
+      var n = Number(v);
+      if (n <= 1.5) n = n * 100;
+      return (Math.round(n * 10) / 10) + '%';
+    }
+    var mkt = g.market_probability != null ? g.market_probability : g.impliedPct;
+    var model = g.modelFairPct != null ? g.modelFairPct : g.fairProbability;
+    if (model != null && model <= 1.5) model = model * 100;
+    var edge = null;
+    try { edge = boardEdge(g); } catch (e) { edge = g.edgePp; }
+    return (
+      '<div class="lf-metric"><b>MKT</b><span>' + pct(mkt) + '</span></div>' +
+      '<div class="lf-metric"><b>MODEL</b><span>' + pct(model) + '</span></div>' +
+      '<div class="lf-metric"><b>EDGE</b><span>' + (edge != null && isFinite(Number(edge)) ? ((Number(edge) > 0 ? '+' : '') + (Math.round(Number(edge) * 10) / 10) + (window.__edgeMode === 'evpct' ? '%' : 'pp')) : '—') + '</span></div>' +
+      '<div class="lf-metric"><b>RANK</b><span>' + escapeHtml(String(g.rank || 'Pass')) + '</span></div>'
+    );
+  }
+  function paintLiveFocus(g) {
+    if (!g) return;
+    __lfGame = g;
+    var ov = $('live-focus-overlay');
+    if (!ov) return;
+    ov.classList.remove('hidden');
+    ov.setAttribute('aria-hidden', 'false');
+    $('lf-title').textContent = boardMatchup(g) || g.eventTitle || g.title || 'Live game';
+    var sub = [String(g.league || '').toUpperCase(), g.marketType || '', g.modelPick || g.pick || ''].filter(Boolean).join(' · ');
+    $('lf-sub').textContent = sub;
+    var score = g.score || (g.espnLive && (g.espnLive.score || g.espnLive.displayScore)) || '—';
+    var period = g.period || (g.espnLive && g.espnLive.period) || (g.live ? 'LIVE' : 'Pregame');
+    $('lf-score').textContent = score;
+    $('lf-period').textContent = period;
+    try {
+      $('lf-clock').textContent = g.startTime ? new Date(g.startTime).toLocaleString() : '';
+    } catch (e) { $('lf-clock').textContent = ''; }
+    $('lf-metrics').innerHTML = liveFocusMetricsHtml(g);
+    var edgeN = null;
+    try { edgeN = boardEdge(g); } catch (e2) { edgeN = g.edgePp; }
+    var edgeTxt = 'Watch residual edge as the price moves. ';
+    if (edgeN != null && isFinite(Number(edgeN))) {
+      edgeTxt += Number(edgeN) > 0
+        ? ('Model still sees about +' + (Math.round(Number(edgeN) * 10) / 10) + ' vs market — live value may still exist.')
+        : ('Model is at or below market (' + (Math.round(Number(edgeN) * 10) / 10) + ') — lean pass unless price improves.');
+    } else {
+      edgeTxt += 'Edge will appear once prices and model update.';
+    }
+    if (g.formNote) edgeTxt += ' · ' + g.formNote;
+    $('lf-edge-box').textContent = edgeTxt;
+    var href = '#';
+    try { href = tradeHrefFor(g) || '#'; } catch (e3) {}
+    $('lf-actions').innerHTML =
+      '<a class="primary" href="' + href + '" target="_blank" rel="noopener">Trade</a>' +
+      '<button type="button" id="lf-refresh">Refresh</button>' +
+      '<button type="button" id="lf-log">Log bet</button>';
+    var rel = $('lf-related');
+    rel.innerHTML = '';
+    var list = window.__lastBoardGames || window.__allGames || [];
+    var et = String(g.eventTitle || g.title || '').toLowerCase().slice(0, 28);
+    var slug = String(g.eventSlug || g.eventTicker || '').toLowerCase();
+    var n = 0;
+    list.forEach(function (x) {
+      if (n >= 8) return;
+      if (x === g) return;
+      var et2 = String(x.eventTitle || x.title || '').toLowerCase();
+      var same = (slug && String(x.eventSlug || x.eventTicker || '').toLowerCase() === slug) ||
+        (et && et2.indexOf(et.slice(0, 12)) >= 0);
+      if (!same) return;
+      n++;
+      var div = document.createElement('div');
+      div.className = 'lf-rel';
+      var e2 = null;
+      try { e2 = boardEdge(x); } catch (e4) {}
+      div.innerHTML = '<strong>' + escapeHtml(String(x.modelPick || x.pick || x.marketType || 'Market')) + '</strong> · ' +
+        escapeHtml(String(x.rank || 'Pass')) +
+        (e2 != null ? (' · edge ' + (Math.round(Number(e2) * 10) / 10)) : '') +
+        ' · ' + escapeHtml(String(x.marketType || ''));
+      div.onclick = function () { paintLiveFocus(x); };
+      rel.appendChild(div);
+    });
+    if (!n) rel.innerHTML = '<div class="lf-rel">No other markets for this game on the current board.</div>';
+    var btnR = $('lf-refresh');
+    if (btnR) btnR.onclick = function () {
+      try { if (typeof loadGames === 'function') loadGames(); } catch (e5) {}
+      setTimeout(function () {
+        var list2 = window.__lastBoardGames || [];
+        var id = String(g.id || g.marketSlug || '');
+        var found = list2.filter(function (x) { return String(x.id || x.marketSlug || '') === id; })[0];
+        if (found) paintLiveFocus(found);
+        else if (__lfGame) paintLiveFocus(__lfGame);
+      }, 1200);
+    };
+    var btnL = $('lf-log');
+    if (btnL) btnL.onclick = function () {
+      try {
+        if (typeof logBet === 'function') logBet(g);
+        else if (typeof openLogBet === 'function') openLogBet(g);
+      } catch (e6) {}
+    };
+  }
+  function openLiveFocus(g) {
+    if (!g) return;
+    paintLiveFocus(g);
+    if (__lfTimer) clearInterval(__lfTimer);
+    __lfTimer = setInterval(function () {
+      if (!__lfGame) return;
+      // soft refresh board while focus open
+      try {
+        if (document.visibilityState === 'hidden') return;
+        if (typeof loadGames === 'function') loadGames();
+      } catch (e) {}
+    }, 45000);
+  }
+  window.openLiveFocus = openLiveFocus;
+  window.closeLiveFocus = closeLiveFocus;
+  document.addEventListener('click', function (ev) {
+    if (ev.target && (ev.target.id === 'lf-close' || ev.target.id === 'live-focus-overlay')) {
+      if (ev.target.id === 'live-focus-overlay' && ev.target !== ev.currentTarget) return;
+      closeLiveFocus();
+    }
+  });
+
+  function renderBoardMobileCards(list) {
+    var host = $('board-cards-mobile');
+    if (!host) return;
+    list = list || [];
+    if (!list.length) {
+      host.innerHTML = '<div class="m-card" style="text-align:center;color:#94a3b8">No markets yet — scan or auto-refresh.</div>';
+      return;
+    }
+    host.innerHTML = list.slice(0, 80).map(function (g) {
+      var match = '';
+      try { match = boardMatchup(g); } catch (e) { match = g.eventTitle || g.title || '—'; }
+      var pick = g.modelPick || g.pick || '—';
+      var mkt = g.market_probability != null ? g.market_probability : g.impliedPct;
+      var model = g.modelFairPct != null ? g.modelFairPct : g.fairProbability;
+      function pct(v) {
+        if (v == null || !isFinite(Number(v))) return '—';
+        var n = Number(v); if (n <= 1.5) n *= 100;
+        return (Math.round(n * 10) / 10) + '%';
+      }
+      var edge = '—';
+      try {
+        var e = boardEdge(g);
+        if (e != null && isFinite(Number(e))) edge = (Number(e) > 0 ? '+' : '') + (Math.round(Number(e) * 10) / 10);
+      } catch (e2) {}
+      var rankHtml = '';
+      try { rankHtml = boardRankPill(g); } catch (e3) { rankHtml = escapeHtml(String(g.rank || 'Pass')); }
+      var live = g.live ? '<span style="color:#f472b6;font-weight:700;font-size:10px">LIVE</span>' : '';
+      var href = '#';
+      try { href = tradeHrefFor(g); } catch (e4) {}
+      var id = escapeHtml(String(g.id || g.marketSlug || Math.random()));
+      return '<div class="m-card" data-gid="' + id + '">' +
+        '<div class="m-card-top"><div><div class="m-card-match">' + escapeHtml(match) + '</div>' +
+        '<div class="m-card-meta">' + live + ' ' + escapeHtml(String(g.league || '').toUpperCase()) + ' · ' + escapeHtml(String(g.marketType || '')) + ' · ' + escapeHtml(String(pick)) + '</div></div>' +
+        '<div>' + rankHtml + '</div></div>' +
+        '<div class="m-card-grid"><div><b>MKT</b><span>' + pct(mkt) + '</span></div><div><b>MODEL</b><span>' + pct(model) + '</span></div><div><b>EDGE</b><span>' + edge + '</span></div></div>' +
+        '<div class="m-card-actions">' +
+        '<a href="' + href + '" target="_blank" rel="noopener">Trade</a>' +
+        '<button type="button" data-mact="focus">Live Focus</button>' +
+        '<button type="button" data-mact="detail">Details</button>' +
+        '</div></div>';
+    }).join('');
+    host.querySelectorAll('.m-card').forEach(function (card, idx) {
+      var g = list[idx];
+      if (!g) return;
+      card.addEventListener('click', function (ev) {
+        var act = ev.target && ev.target.getAttribute('data-mact');
+        if (act === 'focus' || g.live) {
+          ev.preventDefault();
+          openLiveFocus(g);
+          return;
+        }
+        if (act === 'detail') {
+          try { if (typeof selectBoardRow === 'function') selectBoardRow(g); } catch (e) {}
+        }
+      });
+    });
+  }
   function formBadge(g) {
     var q = '';
     try {
@@ -11418,6 +11655,7 @@ function renderBoardTable(list) {
     var meta = $('board-meta');
     if (!tb) return;
     if (!list || !list.length) {
+      try { renderBoardMobileCards([]); } catch (e0) {}
       tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:3rem 1rem">' +
         '<div style="font-size:14px;color:#e2e8f0;margin-bottom:8px">No markets on the board yet</div>' +
         '<div style="font-size:12px;max-width:420px;margin:0 auto;line-height:1.45">Tap <b style="color:#a78bfa">AUTO-REFRESH</b> or wait for scan. ' +
@@ -11452,6 +11690,7 @@ function renderBoardTable(list) {
         '</tr>';
     });
     tb.innerHTML = html;
+    try { renderBoardMobileCards(list); } catch (eMob) {}
     if (meta) {
       var eN = 0, gN = 0;
       list.forEach(function (x) {
@@ -16011,6 +16250,33 @@ function renderSlate() {
         <div id="stats-journal" style="font-size:12px;color:#94a3b8">No data yet</div>
       </div>
     </div>
+  </div>
+</div>
+
+
+<div id="live-focus-overlay" class="lf-overlay hidden" aria-hidden="true">
+  <div class="lf-sheet" role="dialog" aria-label="Live Focus">
+    <div class="lf-head">
+      <div>
+        <div class="lf-kicker">LIVE FOCUS</div>
+        <div id="lf-title" class="lf-title">—</div>
+        <div id="lf-sub" class="lf-sub">—</div>
+      </div>
+      <button type="button" id="lf-close" class="lf-close" aria-label="Close">✕</button>
+    </div>
+    <div class="lf-score-row">
+      <div id="lf-score" class="lf-score">—</div>
+      <div id="lf-period" class="lf-period">—</div>
+      <div id="lf-clock" class="lf-clock"></div>
+    </div>
+    <div class="lf-metrics" id="lf-metrics"></div>
+    <div class="lf-edge-box" id="lf-edge-box"></div>
+    <div class="lf-actions" id="lf-actions"></div>
+    <div class="lf-related">
+      <div class="lf-kicker">Same game markets</div>
+      <div id="lf-related" class="lf-related-list"></div>
+    </div>
+    <p class="lf-note">Live Focus tracks residual edge while the game is on. Prices refresh while this panel is open.</p>
   </div>
 </div>
 
