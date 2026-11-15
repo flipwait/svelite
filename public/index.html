@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EliteOdds Board 3.16.0</title>
+  <title>EliteOdds Board 3.16.1</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -4933,7 +4933,7 @@
   };
 
   
-  var APP_VERSION = '3.16.0';
+  var APP_VERSION = '3.16.1';
   var APP_CHANGELOG = [
     {
       version: '3.13.5',
@@ -11276,6 +11276,19 @@ function kalQuery(mt, strict, allowMkt) {
   }
 
 
+  function formBadge(g) {
+    var q = '';
+    try {
+      q = String((g && (g.formQuality || (g.matchup && g.matchup.formQuality))) || '').toLowerCase();
+    } catch (e) { q = ''; }
+    if (!q) {
+      if (g && g.hasForm) q = 'strong';
+      else q = 'none';
+    }
+    if (q === 'strong') return { text: 'FORM STRONG', cls: 'eo-form-strong' };
+    if (q === 'thin') return { text: 'FORM THIN', cls: 'eo-form-thin' };
+    return { text: 'FORM NONE', cls: 'eo-form-none' };
+  }
   function boardRankPill(g) {
     var r = String(g.rank || 'Pass').toLowerCase();
     var label = String(g.rank || 'Pass');
@@ -11284,8 +11297,10 @@ function kalQuery(mt, strict, allowMkt) {
     else if (/elite/.test(r)) cls = 'elite';
     else if (/good/.test(r)) cls = 'good';
     var fb = formBadge(g);
+    var note = '';
+    try { note = (g && g.formNote) || fb.text; } catch (e2) { note = fb.text; }
     return '<span class="eo-rank-pill ' + cls + '">' + escapeHtml(label) + '</span>' +
-      ' <span class="' + fb.cls + '" title="' + escapeHtml((g && g.formNote) || fb.text) + '">' + fb.text + '</span>';
+      ' <span class="' + fb.cls + '" title="' + escapeHtml(note) + '">' + fb.text + '</span>';
   }
 
   function boardVenueTag(g) {
