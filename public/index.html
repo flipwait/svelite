@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EliteOdds Board 3.16.5</title>
+  <title>EliteOdds Board 3.16.6</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -3280,6 +3280,169 @@
   #board-cards-mobile { display: none !important; }
 }
 
+
+/* ===== MOBILE BOARD v3.16.6 — cards, not table ===== */
+@media (max-width: 900px) {
+  body.eo-board-product .eo-board-table-wrap,
+  body.layout-board .eo-board-table-wrap,
+  .eo-board-table-wrap {
+    display: none !important;
+  }
+  body.eo-board-product #board-cards-mobile,
+  body.layout-board #board-cards-mobile,
+  #board-cards-mobile {
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px 10px 120px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  /* Compact header on mobile */
+  body.eo-board-product .eo-board-header,
+  .dash-top, .eo-board-header {
+    flex-wrap: wrap;
+    gap: 6px !important;
+    padding: 8px 10px !important;
+  }
+  .eo-board-header select,
+  .dash-top select {
+    font-size: 13px !important;
+    min-height: 36px;
+  }
+  /* Full-width board body — detail as sheet */
+  body.eo-board-product .eo-board-body,
+  .eo-board-body {
+    display: block !important;
+    grid-template-columns: 1fr !important;
+  }
+  body.eo-board-product .eo-board-detail,
+  .eo-board-detail,
+  #board-detail {
+    position: fixed !important;
+    left: 0; right: 0; bottom: 56px;
+    max-height: 48vh;
+    z-index: 90;
+    border-radius: 16px 16px 0 0 !important;
+    box-shadow: 0 -8px 32px rgba(0,0,0,.55);
+    overflow: auto;
+    background: #0b1220 !important;
+    border: 1px solid #243047 !important;
+  }
+  body.eo-board-product .eo-board-detail:not([data-open="1"]),
+  #board-detail:not([data-open="1"]) {
+    display: none !important;
+  }
+  body.eo-board-product .eo-board-detail[data-open="1"],
+  #board-detail[data-open="1"] {
+    display: block !important;
+  }
+
+  /* Card design — all pick info on one screen */
+  .m-card {
+    background: linear-gradient(180deg, #121a2b 0%, #0d1422 100%);
+    border: 1px solid #243047;
+    border-radius: 14px;
+    padding: 12px 12px 10px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  }
+  .m-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .m-card-match {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f8fafc;
+    line-height: 1.25;
+  }
+  .m-card-meta {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 3px;
+  }
+  .m-card-pick {
+    margin: 8px 0 6px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: #1e1b4b;
+    border: 1px solid #3730a3;
+    color: #e0e7ff;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .m-card-pick span {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    color: #a5b4fc;
+    letter-spacing: .04em;
+    margin-bottom: 2px;
+  }
+  .m-card-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin: 8px 0 10px;
+  }
+  .m-card-grid div {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 7px 4px;
+    text-align: center;
+  }
+  .m-card-grid b {
+    display: block;
+    font-size: 9px;
+    color: #64748b;
+    letter-spacing: .05em;
+    font-weight: 700;
+  }
+  .m-card-grid span {
+    font-size: 12px;
+    font-weight: 800;
+    color: #e2e8f0;
+  }
+  .m-card-grid span.pos { color: #34d399; }
+  .m-card-grid span.neg { color: #f87171; }
+  .m-card-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .m-card-actions a,
+  .m-card-actions button {
+    min-height: 38px;
+    border-radius: 9px;
+    border: 1px solid #334155;
+    background: #1e293b;
+    color: #e2e8f0;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    padding: 8px 4px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .m-card-actions a.primary,
+  .m-card-actions button.primary {
+    background: #6d28d9;
+    border-color: #7c3aed;
+  }
+  .m-card .live-pill,
+  .m-card .live-pill-btn {
+    margin-left: 4px;
+  }
+}
+@media (min-width: 901px) {
+  #board-cards-mobile { display: none !important; }
+}
+
 </style>
 </head>
 <body class="v3 layout-board eo-board-product">
@@ -3575,6 +3738,7 @@
                   <tbody id="board-tbody"></tbody>
                 </table>
               </div>
+              <div id="board-cards-mobile" class="board-cards-mobile" aria-label="Mobile board cards"></div>
               <aside class="eo-board-detail" id="board-detail">
                 <div class="bd-panel-head"><b>GAME DETAIL</b><span style="color:#64748b;cursor:pointer;font-size:14px" id="bd-close">×</span></div>
                 <div class="bd-panel-body">
@@ -5028,7 +5192,7 @@
   };
 
   
-  var APP_VERSION = '3.16.5';
+  var APP_VERSION = '3.16.6';
   var APP_CHANGELOG = [
     {
       version: '3.13.5',
@@ -11572,6 +11736,11 @@ function kalQuery(mt, strict, allowMkt) {
   document.addEventListener('click', function (ev) {
     var t = ev.target;
     if (!t) return;
+    if (t.id === 'bd-close' || (t.getAttribute && t.getAttribute('id') === 'bd-close')) {
+      var det = $('board-detail');
+      if (det) { det.setAttribute('data-open', '0'); var b = det.querySelector('.bd-panel-body'); if (b) b.innerHTML = '<div class="bd-empty">Select a card for game detail</div>'; }
+      return;
+    }
     if (t.getAttribute && t.getAttribute('data-live-focus')) {
       ev.preventDefault();
       ev.stopPropagation();
@@ -11602,58 +11771,120 @@ function kalQuery(mt, strict, allowMkt) {
     if (!host) return;
     list = list || [];
     if (!list.length) {
-      host.innerHTML = '<div class="m-card" style="text-align:center;color:#94a3b8">No markets yet — scan or auto-refresh.</div>';
+      host.innerHTML = '<div class="m-card" style="text-align:center;color:#94a3b8">No markets yet — pull to refresh or tap AUTO-REFRESH.</div>';
       return;
     }
-    host.innerHTML = list.slice(0, 80).map(function (g, idx) {
-      var match = '';
-      try { match = boardMatchup(g); } catch (e) { match = g.eventTitle || g.title || '—'; }
-      var pick = g.modelPick || g.pick || '—';
-      var mkt = g.market_probability != null ? g.market_probability : g.impliedPct;
-      var model = g.modelFairPct != null ? g.modelFairPct : g.fairProbability;
-      function pct(v) {
-        if (v == null || !isFinite(Number(v))) return '—';
-        var n = Number(v); if (n <= 1.5) n *= 100;
-        return (Math.round(n * 10) / 10) + '%';
-      }
-      var edge = '—';
+    function pct(v) {
+      if (v == null || !isFinite(Number(v))) return '—';
+      var n = Number(v);
+      if (n <= 1.5) n = n * 100;
+      return (Math.round(n * 10) / 10) + '%';
+    }
+    function edgeStr(g) {
       try {
         var e = boardEdge(g);
-        if (e != null && isFinite(Number(e))) edge = (Number(e) > 0 ? '+' : '') + (Math.round(Number(e) * 10) / 10);
+        if (e == null || !isFinite(Number(e))) return { t: '—', cls: '' };
+        var n = Math.round(Number(e) * 10) / 10;
+        return { t: (n > 0 ? '+' : '') + n, cls: n > 0 ? 'pos' : (n < 0 ? 'neg' : '') };
+      } catch (err) { return { t: '—', cls: '' }; }
+    }
+    host.innerHTML = list.slice(0, 100).map(function (g, idx) {
+      var match = '';
+      try {
+        match = (typeof plainMatchup === 'function') ? plainMatchup(g) : (g.eventTitle || g.title || '—');
+      } catch (e) { match = String(g.eventTitle || g.title || '—').replace(/<[^>]+>/g, ''); }
+      match = String(match).replace(/<[^>]+>/g, '').trim();
+      var pick = g.modelPick || g.pick || g.pickName || '—';
+      try {
+        if (typeof formatPropPick === 'function' && /player|prop/i.test(String(g.marketType || ''))) {
+          pick = formatPropPick(g);
+        }
       } catch (e2) {}
+      var market = '';
+      try { market = boardMarket(g); } catch (e3) { market = g.marketType || '—'; }
+      var mkt = pct(g.market_probability != null ? g.market_probability : g.impliedPct);
+      var model = pct(g.modelFairPct != null ? g.modelFairPct : g.fairProbability);
+      var ed = edgeStr(g);
       var rankHtml = '';
-      try { rankHtml = boardRankPill(g); } catch (e3) { rankHtml = escapeHtml(String(g.rank || 'Pass')); }
-      var live = g.live ? '<span style="color:#f472b6;font-weight:700;font-size:10px">LIVE</span>' : '';
+      try { rankHtml = boardRankPill(g); } catch (e4) { rankHtml = '<span class="eo-rank-pill pass">' + escapeHtml(String(g.rank || 'Pass')) + '</span>'; }
+      var live = g.live
+        ? '<button type="button" class="live-pill live-pill-btn" data-live-focus="1">LIVE</button>'
+        : '';
+      var when = '';
+      try {
+        if (typeof formatGameWhen === 'function' && g.startTime) when = formatGameWhen(g.startTime, !!g.live, !!g.ended);
+        else if (g.startTime) when = new Date(g.startTime).toLocaleString();
+      } catch (e5) {}
       var href = '#';
-      try { href = tradeHrefFor(g); } catch (e4) {}
-      var id = escapeHtml(String(g.id || g.marketSlug || Math.random()));
+      try { href = tradeHrefFor(g) || '#'; } catch (e6) {}
+      var id = escapeHtml(String(g.id || g.marketSlug || idx));
+      var venue = String(g.venue || g.source || 'polymarket');
+      venue = venue.charAt(0).toUpperCase() + venue.slice(1);
       return '<div class="m-card" data-gid="' + id + '" data-idx="' + idx + '">' +
-        '<div class="m-card-top"><div><div class="m-card-match">' + escapeHtml(match) + '</div>' +
-        '<div class="m-card-meta">' + live + ' ' + escapeHtml(String(g.league || '').toUpperCase()) + ' · ' + escapeHtml(String(g.marketType || '')) + ' · ' + escapeHtml(String(pick)) + '</div></div>' +
-        '<div>' + rankHtml + '</div></div>' +
-        '<div class="m-card-grid"><div><b>MKT</b><span>' + pct(mkt) + '</span></div><div><b>MODEL</b><span>' + pct(model) + '</span></div><div><b>EDGE</b><span>' + edge + '</span></div></div>' +
+        '<div class="m-card-top"><div style="min-width:0;flex:1">' +
+          '<div class="m-card-match">' + escapeHtml(match) + '</div>' +
+          '<div class="m-card-meta">' + live + ' ' + escapeHtml(String(g.league || '').toUpperCase()) +
+            ' · ' + escapeHtml(String(market)) +
+            (when ? ' · ' + escapeHtml(when) : '') +
+            ' · ' + escapeHtml(venue) +
+          '</div>' +
+        '</div><div style="flex-shrink:0">' + rankHtml + '</div></div>' +
+        '<div class="m-card-pick"><span>PICK</span>' + escapeHtml(String(pick)) + '</div>' +
+        '<div class="m-card-grid">' +
+          '<div><b>MKT</b><span>' + mkt + '</span></div>' +
+          '<div><b>MODEL</b><span>' + model + '</span></div>' +
+          '<div><b>EDGE</b><span class="' + ed.cls + '">' + ed.t + '</span></div>' +
+          '<div><b>RANK</b><span>' + escapeHtml(String(g.rank || 'Pass')) + '</span></div>' +
+        '</div>' +
         '<div class="m-card-actions">' +
-        '<a href="' + href + '" target="_blank" rel="noopener">Trade</a>' +
-        '<button type="button" data-mact="focus">Live Focus</button>' +
-        '<button type="button" data-mact="detail">Details</button>' +
+          '<a class="primary" href="' + href + '" target="_blank" rel="noopener">Trade</a>' +
+          '<button type="button" data-mact="detail">Detail</button>' +
+          '<button type="button" data-mact="focus">' + (g.live ? 'Live' : 'Focus') + '</button>' +
+          '<button type="button" data-mact="combo">Combo</button>' +
         '</div></div>';
     }).join('');
-    host.querySelectorAll('.m-card').forEach(function (card, idx) {
+    host.querySelectorAll('.m-card').forEach(function (card) {
+      var idx = Number(card.getAttribute('data-idx'));
       var g = list[idx];
       if (!g) return;
       card.addEventListener('click', function (ev) {
-        var act = ev.target && ev.target.getAttribute('data-mact');
-        if (act === 'focus' || g.live) {
+        var t = ev.target;
+        var act = t && t.getAttribute && t.getAttribute('data-mact');
+        if (t && t.getAttribute && t.getAttribute('data-live-focus')) {
           ev.preventDefault();
           openLiveFocus(g);
           return;
         }
-        if (act === 'detail') {
-          try { if (typeof selectBoardRow === 'function') selectBoardRow(g); } catch (e) {}
+        if (act === 'focus') {
+          ev.preventDefault();
+          openLiveFocus(g);
+          return;
+        }
+        if (act === 'combo') {
+          ev.preventDefault();
+          try { if (typeof addToCombo === 'function') addToCombo(g); } catch (e) {}
+          return;
+        }
+        if (act === 'detail' || !act) {
+          try {
+            var det = $('board-detail');
+            if (det) det.setAttribute('data-open', '1');
+            if (typeof renderBoardDetail === 'function') renderBoardDetail(g);
+            else if (typeof paintBoardDetail === 'function') paintBoardDetail(g);
+            else if (typeof selectBoardRow === 'function') selectBoardRow(g);
+            else {
+              // fallback: open detail via existing click path
+              window.__boardSelected = g;
+              if (typeof updateBoardDetail === 'function') updateBoardDetail(g);
+            }
+          } catch (e2) {
+            try { openLiveFocus(g); } catch (e3) {}
+          }
         }
       });
     });
   }
+
   function formBadge(g) {
     var q = '';
     try {
@@ -11903,6 +12134,7 @@ function renderBoardTable(list) {
       insights.push('<b>Live board:</b> ' + escapeHtml(String(g.score || '')) + ' ' + escapeHtml(String(g.period || '')));
     }
     var body = el.querySelector('.bd-panel-body') || el;
+    el.setAttribute('data-open', '1');
     body.innerHTML =
       '<div class="bd-match">' + escapeHtml(title) +
         (g.live ? ' <span class="bd-live">· LIVE</span>' : '') + '</div>' +
