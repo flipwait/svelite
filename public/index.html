@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EliteOdds Board 3.16.4</title>
+  <title>EliteOdds Board 3.16.5</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -4731,6 +4731,21 @@
     n = Math.round(n * 10) / 10;
     return { t: (n >= 0 ? '+' : '') + n + 'pp', c: n > 2 ? 'eo-edge-pos' : (n < -2 ? 'eo-edge-neg' : 'eo-edge-zero') };
   }
+  function plainMatchup(g) {
+    if (!g) return '—';
+    var t = '';
+    try {
+      if (typeof cleanBoardTitle === 'function') t = cleanBoardTitle(g) || '';
+    } catch (e0) {}
+    if (!t) {
+      var a = g.away || g.awayTeam || '';
+      var h = g.home || g.homeTeam || '';
+      t = (a && h) ? (a + ' vs ' + h) : String(g.eventTitle || g.title || g.question || '—');
+    }
+    // Strip any accidental HTML
+    t = String(t).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return t || '—';
+  }
   function boardMatchup(g) {
     if (!g) return '—';
     var title = '';
@@ -5013,7 +5028,7 @@
   };
 
   
-  var APP_VERSION = '3.16.4';
+  var APP_VERSION = '3.16.5';
   var APP_CHANGELOG = [
     {
       version: '3.13.5',
@@ -11405,72 +11420,70 @@ function kalQuery(mt, strict, allowMkt) {
     if (!ov) return;
     ov.classList.remove('hidden');
     ov.setAttribute('aria-hidden', 'false');
-    $('lf-title').textContent = boardMatchup(g) || g.eventTitle || g.title || 'Live game';
-    var sub = [String(g.league || '').toUpperCase(), g.marketType || '', g.modelPick || g.pick || ''].filter(Boolean).join(' · ');
-    $('lf-sub').textContent = sub;
+    var titleEl = $('lf-title');
+    var subEl = $('lf-sub');
+    var titleTxt = plainMatchup(g);
+    if (titleEl) titleEl.textContent = titleTxt;
+    if (subEl) {
+      subEl.textContent = [String(g.league || '').toUpperCase(), g.marketType || '', g.modelPick || g.pick || '', g.live ? 'LIVE' : ''].filter(Boolean).join(' · ');
+    }
+    function setScore(sc, per, clock) {
+      if ($('lf-score')) $('lf-score').textContent = sc || '—';
+      if ($('lf-period')) $('lf-period').textContent = per || (g.live ? 'LIVE' : 'Pregame');
+      if ($('lf-clock')) $('lf-clock').textContent = clock || '';
+    }
     var score = g.score || (g.espnLive && (g.espnLive.score || g.espnLive.displayScore)) || '—';
     var period = g.period || (g.espnLive && g.espnLive.period) || (g.live ? 'LIVE' : 'Pregame');
-    $('lf-score').textContent = score;
-    $('lf-period').textContent = period;
-    try {
-      $('lf-clock').textContent = g.startTime ? new Date(g.startTime).toLocaleString() : '';
-    } catch (e) { $('lf-clock').textContent = ''; }
-    $('lf-metrics').innerHTML = liveFocusMetricsHtml(g);
+    var clock = '';
+    try { clock = g.startTime ? new Date(g.startTime).toLocaleString() : ''; } catch (e) {}
+    setScore(score, period, clock);
+    if ($('lf-metrics')) $('lf-metrics').innerHTML = liveFocusMetricsHtml(g);
     var edgeN = null;
     try { edgeN = boardEdge(g); } catch (e2) { edgeN = g.edgePp; }
-    var edgeTxt = 'Watch residual edge as the price moves. ';
+    var edgeTxt = '';
     if (edgeN != null && isFinite(Number(edgeN))) {
-      edgeTxt += Number(edgeN) > 0
+      edgeTxt = Number(edgeN) > 0
         ? ('Model still sees about +' + (Math.round(Number(edgeN) * 10) / 10) + ' vs market — live value may still exist.')
         : ('Model is at or below market (' + (Math.round(Number(edgeN) * 10) / 10) + ') — lean pass unless price improves.');
     } else {
-      edgeTxt += 'Edge will appear once prices and model update.';
+      edgeTxt = 'Watch residual edge as the price moves.';
     }
-    if (g.formNote) edgeTxt += ' · ' + g.formNote;
-    $('lf-edge-box').textContent = edgeTxt;
+    if (g.formNote) edgeTxt += ' · ' + String(g.formNote).replace(/<[^>]+>/g, '');
+    if ($('lf-edge-box')) $('lf-edge-box').textContent = edgeTxt;
     var href = '#';
     try { href = tradeHrefFor(g) || '#'; } catch (e3) {}
-    $('lf-actions').innerHTML =
-      '<a class="primary" href="' + href + '" target="_blank" rel="noopener">Trade</a>' +
-      '<button type="button" id="lf-refresh">Refresh</button>' +
-      '<button type="button" id="lf-log">Log bet</button>';
+    if ($('lf-actions')) {
+      $('lf-actions').innerHTML =
+        '<a class="primary" href="' + href + '" target="_blank" rel="noopener">Trade</a>' +
+        '<button type="button" id="lf-refresh">Refresh</button>' +
+        '<button type="button" id="lf-log">Log bet</button>';
+    }
     var rel = $('lf-related');
-    rel.innerHTML = '';
-    var list = window.__lastBoardGames || window.__allGames || [];
-    var et = String(g.eventTitle || g.title || '').toLowerCase().slice(0, 28);
-    var slug = String(g.eventSlug || g.eventTicker || '').toLowerCase();
-    var n = 0;
-    list.forEach(function (x) {
-      if (n >= 8) return;
-      if (x === g) return;
-      var et2 = String(x.eventTitle || x.title || '').toLowerCase();
-      var same = (slug && String(x.eventSlug || x.eventTicker || '').toLowerCase() === slug) ||
-        (et && et2.indexOf(et.slice(0, 12)) >= 0);
-      if (!same) return;
-      n++;
-      var div = document.createElement('div');
-      div.className = 'lf-rel';
-      var e2 = null;
-      try { e2 = boardEdge(x); } catch (e4) {}
-      div.innerHTML = '<strong>' + escapeHtml(String(x.modelPick || x.pick || x.marketType || 'Market')) + '</strong> · ' +
-        escapeHtml(String(x.rank || 'Pass')) +
-        (e2 != null ? (' · edge ' + (Math.round(Number(e2) * 10) / 10)) : '') +
-        ' · ' + escapeHtml(String(x.marketType || ''));
-      div.onclick = function () { paintLiveFocus(x); };
-      rel.appendChild(div);
-    });
-    if (!n) rel.innerHTML = '<div class="lf-rel">No other markets for this game on the current board.</div>';
+    if (rel) {
+      rel.innerHTML = '';
+      var list = window.__lastBoardGames || window.__allGames || [];
+      var et = plainMatchup(g).toLowerCase().slice(0, 24);
+      var n = 0;
+      list.forEach(function (x) {
+        if (n >= 10) return;
+        if (x === g) return;
+        var et2 = plainMatchup(x).toLowerCase();
+        var same = et && et2 && (et2.indexOf(et.slice(0, 10)) >= 0 || et.indexOf(et2.slice(0, 10)) >= 0);
+        if (!same) return;
+        n++;
+        var div = document.createElement('div');
+        div.className = 'lf-rel';
+        var e2 = null;
+        try { e2 = boardEdge(x); } catch (e4) {}
+        var e2s = (e2 != null && isFinite(Number(e2))) ? (Math.round(Number(e2) * 10) / 10) : '—';
+        div.textContent = (x.modelPick || x.pick || x.marketType || 'Market') + ' · ' + (x.rank || 'Pass') + ' · edge ' + e2s + ' · ' + (x.marketType || '');
+        div.onclick = function () { paintLiveFocus(x); };
+        rel.appendChild(div);
+      });
+      if (!n) rel.innerHTML = '<div class="lf-rel">No other markets for this game on the current board.</div>';
+    }
     var btnR = $('lf-refresh');
-    if (btnR) btnR.onclick = function () {
-      try { if (typeof loadGames === 'function') loadGames(); } catch (e5) {}
-      setTimeout(function () {
-        var list2 = window.__lastBoardGames || [];
-        var id = String(g.id || g.marketSlug || '');
-        var found = list2.filter(function (x) { return String(x.id || x.marketSlug || '') === id; })[0];
-        if (found) paintLiveFocus(found);
-        else if (__lfGame) paintLiveFocus(__lfGame);
-      }, 1200);
-    };
+    if (btnR) btnR.onclick = function () { refreshLiveFocus(true); };
     var btnL = $('lf-log');
     if (btnL) btnL.onclick = function () {
       try {
@@ -11478,19 +11491,82 @@ function kalQuery(mt, strict, allowMkt) {
         else if (typeof openLogBet === 'function') openLogBet(g);
       } catch (e6) {}
     };
+    // ESPN live tracker
+    fetchEspnLiveIntoFocus(g);
+  }
+  function fetchEspnLiveIntoFocus(g) {
+    if (!g) return;
+    var league = String(g.league || '').toLowerCase();
+    var title = plainMatchup(g);
+    if (!league || league === 'ufc' || league === 'esports') {
+      // ESPN may not cover; keep board data
+      return;
+    }
+    var url = '/api/tools?action=live-focus&league=' + encodeURIComponent(league) + '&title=' + encodeURIComponent(title);
+    fetch(url).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || !d.live || !d.live.ok) return;
+      var L = d.live;
+      if ($('lf-score') && L.score) $('lf-score').textContent = L.score;
+      if ($('lf-period')) $('lf-period').textContent = L.period || L.detail || (L.live ? 'LIVE' : '—');
+      if ($('lf-clock') && L.clock) $('lf-clock').textContent = L.clock;
+      if (__lfGame) {
+        __lfGame.score = L.score || __lfGame.score;
+        __lfGame.period = L.period || __lfGame.period;
+        __lfGame.espnLive = L;
+      }
+    }).catch(function () {});
+  }
+  function refreshLiveFocus(force) {
+    if (!__lfGame) return;
+    fetchEspnLiveIntoFocus(__lfGame);
+    if (force) {
+      try { if (typeof loadGames === 'function') loadGames(); } catch (e) {}
+      setTimeout(function () {
+        var list2 = window.__lastBoardGames || [];
+        var id = String(__lfGame.id || __lfGame.marketSlug || '');
+        var found = list2.filter(function (x) { return String(x.id || x.marketSlug || '') === id; })[0];
+        if (found) {
+          // keep ESPN fields
+          found.score = __lfGame.score || found.score;
+          found.period = __lfGame.period || found.period;
+          found.espnLive = __lfGame.espnLive || found.espnLive;
+          paintLiveFocus(found);
+        } else {
+          paintLiveFocus(__lfGame);
+        }
+      }, 1500);
+    } else {
+      // soft: only update metrics from board list if present
+      var list2 = window.__lastBoardGames || [];
+      var id = String(__lfGame.id || __lfGame.marketSlug || '');
+      var found = list2.filter(function (x) { return String(x.id || x.marketSlug || '') === id; })[0];
+      if (found && $('lf-metrics')) {
+        $('lf-metrics').innerHTML = liveFocusMetricsHtml(found);
+        var edgeN = null;
+        try { edgeN = boardEdge(found); } catch (e) {}
+        if ($('lf-edge-box') && edgeN != null && isFinite(Number(edgeN))) {
+          $('lf-edge-box').textContent = 'Live edge now ' + (Number(edgeN) > 0 ? '+' : '') + (Math.round(Number(edgeN) * 10) / 10) + 'pp · prices moving';
+        }
+        __lfGame = Object.assign({}, __lfGame, found);
+      }
+      fetchEspnLiveIntoFocus(__lfGame);
+    }
   }
   function openLiveFocus(g) {
     if (!g) return;
     paintLiveFocus(g);
     if (__lfTimer) clearInterval(__lfTimer);
+    // Interactive: ESPN clock every 20s, price soft-refresh every 45s
+    var ticks = 0;
     __lfTimer = setInterval(function () {
       if (!__lfGame) return;
-      // soft refresh board while focus open
-      try {
-        if (document.visibilityState === 'hidden') return;
-        if (typeof loadGames === 'function') loadGames();
-      } catch (e) {}
-    }, 45000);
+      if (document.visibilityState === 'hidden') return;
+      ticks++;
+      try { refreshLiveFocus(false); } catch (e) {}
+      if (ticks % 2 === 0) {
+        try { if (typeof loadGames === 'function') loadGames(); } catch (e2) {}
+      }
+    }, 20000);
   }
   window.openLiveFocus = openLiveFocus;
   document.addEventListener('click', function (ev) {
