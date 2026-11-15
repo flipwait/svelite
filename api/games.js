@@ -519,6 +519,7 @@ function scoreOne(m, ev, matchup, rankOpts, yesIsHome) {
     eventTitle: (ev && (ev.title || ev.name)) || null,
     line: lineVal,
     venue: 'polymarket',
+    matchup: matchup || null,
   }, rankOpts || {});
 }
 
@@ -844,6 +845,7 @@ module.exports = async function handler(req, res) {
     };
 
     let events;
+    let _expandMeta = null;
     if (league === 'esports') {
       const es = await Promise.all(['lol', 'cs2', 'dota2', 'valorant', 'cod'].map((l) => fetchLeagueEvents(l, { limit: 10, expandMarkets: true, maxEventsExpand: 6, maxMarkets: 300 })));
       events = es.flat();
@@ -852,16 +854,23 @@ module.exports = async function handler(req, res) {
       events = await fetchSoccerEvents({ limitPerLeague: marketType === 'all' ? 18 : 24 });
     } else if (league && league !== 'all' && LEAGUES.includes(league)) {
       events = await fetchLeagueEvents(league, {
-          limit: marketType === 'all' ? 18 : 28,
+          // Single-sport: deeper board (more events expanded = props/spreads/totals)
+          limit: marketType === 'all' ? 30 : 40,
           expandMarkets: true,
-          maxEventsExpand: marketType === 'player_props' || String(marketType).indexOf('player_') === 0 ? 12 : (marketType === 'all' ? 8 : 10),
-          maxMarkets: marketType === 'player_props' || String(marketType).indexOf('player_') === 0 ? 400 : 280,
+          maxEventsExpand: marketType === 'player_props' || String(marketType).indexOf('player_') === 0 ? 20 : (marketType === 'all' ? 16 : 18),
+          maxMarkets: marketType === 'player_props' || String(marketType).indexOf('player_') === 0 ? 450 : 320,
+          expandTimeoutMs: 7000,
         });
+        // Preserve expand meta if array was annotated
+        _expandMeta = events && events._expandMeta ? events._expandMeta : null;
     } else {
       // all sports + all markets
       events = await fetchAllSportsEvents({
-        limitPerLeague: marketType === 'all' ? 8 : 10,
-        // expand inside fetchLeagueEvents per league — pass via patched fetchAll
+        // Touch every POLYMARKET league so All sports is consistent with Kalshi/Novig scans
+        limitPerLeague: marketType === 'all' ? 10 : 12,
+        expandMarkets: true,
+        maxEventsExpand: marketType === 'all' ? 6 : 8,
+        maxMarkets: 280,
       });
     }
     if (mode === 'live') events = events.filter((e) => e.live && !e.ended);
@@ -913,10 +922,14 @@ module.exports = async function handler(req, res) {
       const seen = new Set();
       const jobs = [];
       // Prioritize esports events for form fetch
+      // Prefer soonest games for form (single-sport QC); esports still prioritized slightly
       const evSorted = events.slice().sort((a, b) => {
         const ae = typeof isEsportsLeague === 'function' && isEsportsLeague(a.league) ? 0 : 1;
         const be = typeof isEsportsLeague === 'function' && isEsportsLeague(b.league) ? 0 : 1;
-        return ae - be;
+        if (ae !== be) return ae - be;
+        const ta = new Date(a.startTime || a.startDate || 0).getTime() || 0;
+        const tb = new Date(b.startTime || b.startDate || 0).getTime() || 0;
+        return ta - tb;
       });
       for (const ev of evSorted) {
         const title = ev.title || ev.name || '';
@@ -925,7 +938,7 @@ module.exports = async function handler(req, res) {
         seen.add(title);
         const _esJobs = league === 'esports' || ['lol','cs2','dota2','valorant','cod'].includes(String(league||''))
           || (typeof isEsportsLeague === 'function' && isEsportsLeague(lg));
-        if (jobs.length >= (_esJobs ? 10 : (league && league !== "all" ? 12 : 8))) break;
+        if (jobs.length >= (_esJobs ? 12 : (league && league !== "all" && league !== 'all' ? 18 : 10))) break;
         jobs.push(
           (async () => {
             let m = null;
@@ -1260,6 +1273,8 @@ const flattenTypes = ['map_1','map_2','map_3','map_total','map_winner','inning_1
             line: m.line != null ? Number(m.line) : null,
             side: sc && sc.side ? sc.side : 'YES',
             rank: sc ? sc.rank : 'Pass',
+            formQuality: sc && sc.formQuality ? sc.formQuality : (matchup && matchup.formQuality) || null,
+            formNote: sc && sc.formNote ? sc.formNote : (matchup && matchup.formNote) || null,
             playerProp: m.playerProp || null,
             propProjection: m.propProjection != null ? m.propProjection : (m.playerProp && m.playerProp.projection != null ? m.playerProp.projection : null),
             propDetail: m.propDetail || (m.playerProp && m.playerProp.detail) || null,
@@ -1345,9 +1360,28 @@ const flattenTypes = ['map_1','map_2','map_3','map_total','map_winner','inning_1
       const seen = new Map();
       const eliteMode = String(rankFilter || '').toLowerCase() === 'elite';
       const maxPerType = eliteMode ? 6 : (marketType === 'all' ? 3 : 4);
+      function mainLineScore(row) {
+        // Prefer primary/main lines over alternate numbers when scores are close
+        const q = String(row.question || row.title || '').toLowerCase();
+        const smt = String(row.sportsMarketType || row.marketType || '').toLowerCase();
+        let s = 0;
+        if (/\bmain\b|primary/.test(q + smt)) s += 5;
+        if (row.line != null && Number.isFinite(Number(row.line))) {
+          // Whole or half lines slightly preferred over exotic thirds
+          const ln = Math.abs(Number(row.line));
+          if (Math.abs(ln * 2 - Math.round(ln * 2)) < 1e-6) s += 2; // x.0 or x.5
+        }
+        // Higher liquidity / volume ≈ more "main"
+        s += Math.min(3, Math.log10((row.liquidity || row._vol || 1) + 1));
+        return s;
+      }
       flat.sort((a, b) => {
-        // Prefer higher score first so Elites survive the per-type cap
         const sc = (b.betScore || 0) - (a.betScore || 0);
+        // Within 4 score points, prefer main-ish lines
+        if (Math.abs(sc) < 4) {
+          const ml = mainLineScore(b) - mainLineScore(a);
+          if (ml) return ml;
+        }
         if (sc) return sc;
         const pa = typePriority[String(a.marketType)] || 50;
         const pb = typePriority[String(b.marketType)] || 50;
@@ -1394,28 +1428,34 @@ const flattenTypes = ['map_1','map_2','map_3','map_total','map_winner','inning_1
         });
       } else if (rankFilter === 'pass') {
         out = out.filter((g) => g.rank === 'Pass');
-      } else if (rankFilter === 'all') {
-        /* keep Pass + Good + Elite */
-      } else if (rankFilter === 'good' || !rankFilter) {
-        // Default board: Good / Elite / POTD only
+      } else if (rankFilter === 'all' || !rankFilter || rankFilter === '') {
+        /* keep Pass + Good + Elite — default so single-sport scans are never empty */
+      } else if (rankFilter === 'good' || rankFilter === 'good+elite' || rankFilter === 'goodelite') {
+        // Explicit Good+ only
         const before = out.slice();
         out = out.filter((g) => {
           const r = String(g.rank || '');
           return r === 'Good' || r === 'Elite' || r === 'POTD' || r === 'Super Elite';
         });
-        // Props: if nothing clears Good+, show Pass so board is not empty
-        if (!out.length && before.length && (String(marketType || '').indexOf('player_') === 0 || marketType === 'player_props' || marketType === 'prop')) {
-          out = before;
-        }
+        // If nothing clears Good+, fall back to full list so sport boards are not blank
+        if (!out.length && before.length) out = before;
       }
 
+      const fetchedAt = new Date().toISOString();
+      out.forEach((g) => {
+        g.fetchedAt = fetchedAt;
+        g.priceAt = fetchedAt;
+        g.venue = g.venue || 'polymarket';
+      });
       return res.status(200).json({
         ok: true,
         source: 'gateway.polymarket.us',
         leagues: LEAGUES,
         marketType,
         flat: true,
-        updatedAt: new Date().toISOString(),
+        updatedAt: fetchedAt,
+        expandMeta: (typeof _expandMeta !== 'undefined' && _expandMeta) ? _expandMeta : undefined,
+        formQuota: { note: 'ESPN form attached to soonest events first (higher quota on single-sport scans)' },
         summary: {
           total: out.length,
           live: out.filter((g) => g.live).length,
@@ -1583,7 +1623,7 @@ const flattenTypes = ['map_1','map_2','map_3','map_total','map_winner','inning_1
       filtered = filtered.filter((g) => g.rank === 'Pass');
     } else if (rankFilter === 'all') {
       /* keep all ranks */
-    } else if (rankFilter === 'good' || !rankFilter) {
+    } else if (rankFilter === 'good' || rankFilter === 'good+elite') {
       const before = filtered.slice();
       filtered = filtered.filter((g) => {
         const r = String(g.rank || '');

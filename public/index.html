@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EliteOdds Board v3.13.8</title>
+  <title>EliteOdds Board 3.16.0</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -3457,6 +3457,7 @@
               <div>
                 <label style="display:block;font-size:9px;color:#64748b;letter-spacing:0.06em">RANK</label>
                 <select class="dash-select" id="dash-rank">
+                  <option value="all">All ranks</option>
                   <option value="good">Good+Elite</option>
                   <option value="good_potd">Good+Elite+POTD</option>
                   <option value="elite">Elite only</option>
@@ -4677,6 +4678,8 @@
   } catch (eW) {}
   // ===== end board helpers =====
 
+  // Must stay in sync with lib/scanLeagues.js (All sports pulls every id below)
+  var ALL_SCAN_SPORTS = ['mlb','nfl','nba','nhl','cfb','cbb','wnba','ufc','atp','wta','soccer','esports'];
   var SPORTS = [
     { id: 'mlb', label: 'MLB' },
     { id: 'nfl', label: 'NFL' },
@@ -4930,7 +4933,7 @@
   };
 
   
-  var APP_VERSION = '3.13.8';
+  var APP_VERSION = '3.16.0';
   var APP_CHANGELOG = [
     {
       version: '3.13.5',
@@ -6540,6 +6543,19 @@
     return /nrfi|yrfi|total|f5|spread|inning|prop|player_|pitcher_|map_/.test(mt);
   }
 
+  
+  var qcMode = false;
+  try { qcMode = localStorage.getItem('bb_qc_mode') === '1'; } catch (e) {}
+  function setQcMode(on) {
+    qcMode = !!on;
+    try { localStorage.setItem('bb_qc_mode', qcMode ? '1' : '0'); } catch (e) {}
+    try {
+      if ($('qc-mode-toggle')) $('qc-mode-toggle').checked = qcMode;
+      document.body.classList.toggle('eo-qc-mode', qcMode);
+    } catch (e2) {}
+  }
+  function isQcMode() { return !!qcMode; }
+
   var sport = 'all', mode = 'both', dayFilter = 'next3', marketType = 'all', venue = 'polymarket';
   var boardRefreshedAt = null;
   var sortMode = 'time';
@@ -6555,7 +6571,6 @@
       function kalshiPathOk(u) {
         return /kalshi\.com\/markets\/[a-z0-9-]+\/[a-z0-9-]+/i.test(String(u || ''));
       }
-      // Prefer API-built deep links first
       if (kalshiPathOk(g.kalshiUrl)) return g.kalshiUrl;
       if (kalshiPathOk(g.tradeUrl)) return g.tradeUrl;
       if (kalshiPathOk(g.marketUrl)) return g.marketUrl;
@@ -6565,92 +6580,46 @@
       var et = String(g.eventTicker || g.event_ticker || '').trim();
       var mt = String(g.marketTicker || g.ticker || g.marketSlug || g.slug || '').trim();
       var ser = String(g.series || g.seriesTicker || g.series_ticker || '').trim();
-      // Strip outcome suffixes like -YES -NO from tickers
       mt = mt.replace(/-(YES|NO|yes|no)$/,'');
       if (et) et = et.replace(/-(YES|NO|yes|no)$/,'');
       if (!ser && et) {
-        // KXNBAGAME-... or NBA-... → series prefix before first long segment
         var parts = et.split('-');
         ser = parts[0] || '';
-        if (/^KX/i.test(ser) && parts.length > 1) ser = parts[0];
       }
       if (!ser && mt) ser = mt.split('-')[0] || '';
-      if (!et && mt && mt.indexOf('-') > 0) {
-        // market ticker often SERIES-EVENT-OUTCOME — use SERIES-EVENT as event path
-        var segs = mt.split('-');
-        if (segs.length >= 2) et = segs.slice(0, Math.min(4, segs.length)).join('-');
+      if (ser && et) return 'https://kalshi.com/markets/' + encodeURIComponent(ser.toLowerCase()) + '/' + encodeURIComponent(et.toLowerCase());
+      if (ser && mt) return 'https://kalshi.com/markets/' + encodeURIComponent(ser.toLowerCase()) + '/' + encodeURIComponent(mt.toLowerCase());
+      return 'https://kalshi.com/markets';
+    }
+    // Novig
+    if (g.venue === 'novig' || g.source === 'novig') {
+      if (g.tradeUrl) return g.tradeUrl;
+      if (g.url) return g.url;
+      return 'https://novig.com';
+    }
+    // Polymarket US — prefer exact market for props / spreads / totals; event for ML
+    function pmOk(u) {
+      return u && /polymarket\.us\//i.test(String(u));
+    }
+    var mt0 = String(g.marketType || g.scanType || '').toLowerCase();
+    var wantMarket = /spread|total|prop|player_|over|under|nrfi|f5|team_total|pitcher|batter/i.test(mt0)
+      || /spread|total|prop|player_/i.test(String(g.question || ''));
+    if (wantMarket) {
+      if (pmOk(g.marketUrl)) return g.marketUrl;
+      if (g.marketSlug) return 'https://polymarket.us/market/' + encodeURIComponent(g.marketSlug);
+      if (g.slug && String(g.slug).indexOf('nba-') !== 0 && String(g.slug).indexOf('nfl-') !== 0) {
+        // market slug often differs from event slug
+        if (pmOk(g.url) && /\/market\//i.test(g.url)) return g.url;
       }
-      // Kalshi needs /markets/{series}/{event} — bare /markets/{TICKER} often 404s
-      if (ser && et) {
-        return 'https://kalshi.com/markets/' + encodeURIComponent(ser.toLowerCase()) + '/' + encodeURIComponent(et.toLowerCase());
-      }
-      if (ser && mt) {
-        return 'https://kalshi.com/markets/' + encodeURIComponent(ser.toLowerCase()) + '/' + encodeURIComponent(mt.toLowerCase());
-      }
-      if (et) {
-        var s2 = et.split('-')[0].toLowerCase();
-        return 'https://kalshi.com/markets/' + encodeURIComponent(s2) + '/' + encodeURIComponent(et.toLowerCase());
-      }
-      if (g.marketUrl && /kalshi\.com/i.test(String(g.marketUrl))) return g.marketUrl;
-      if (g.url && /kalshi\.com/i.test(String(g.url))) return g.url;
-      var title = g.eventTitle || g.title || '';
-      if (title) return 'https://kalshi.com/browse?search=' + encodeURIComponent(title);
-      return 'https://kalshi.com/browse/sports';
     }
-
-    // Polymarket US: /market/{slug} REDIRECTS TO HOME (broken).
-    // Only /event/{eventSlug} works. Optional ?market= for prop/line context.
-    function extractEventSlug(s) {
-      s = String(s || '');
-      var em = s.match(/\/event\/([^/?#]+)/i);
-      if (em) return em[1];
-      var m = s.match(/((?:nba|nhl|nfl|cfb|cbb|mlb|wnba|ufc|mls|epl|lal|bun|sea|ucl)-[a-z0-9]+-[a-z0-9]+-\d{4}-\d{2}-\d{2})/i);
-      return m ? m[1] : '';
-    }
-    function isMarketShaped(s) {
-      s = String(s || '').replace(/^\/+/, '').split('?')[0];
-      if (!s) return false;
-      if (/^(nba|nhl|nfl|cfb|cbb|mlb|wnba|ufc|mls|epl)-[a-z0-9]+-[a-z0-9]+-\d{4}-\d{2}-\d{2}$/i.test(s)) return false;
-      if (/^(astatc|tsc|asc|atc)-/i.test(s)) return true;
-      if (/-(total|spread|pts|reb|ast|blk|stl|pra|gte|lte|neg|pos|1h|2h|q[1-4]|f5|nrfi)/i.test(s)) return true;
-      if (/\d{4}-\d{2}-\d{2}-.+/i.test(s) && s.length > 28) return true;
-      return false;
-    }
-
-    var es = '';
-    if (g.eventSlug) es = extractEventSlug(g.eventSlug) || String(g.eventSlug).replace(/^\/+/, '').split('?')[0];
-    if (!es) es = extractEventSlug(g.url);
-    if (!es) es = extractEventSlug(g.eventUrl);
-    if (!es) es = extractEventSlug(g.slug);
-    if (!es) es = extractEventSlug(g.marketSlug);
-    if (!es) es = extractEventSlug(g.marketUrl);
-
-    // Derive event from market slug: astatc-nba-ind-no-2026-10-21-pra-… → nba-ind-no-2026-10-21
-    if (!es) {
-      var raw = String(g.marketSlug || g.slug || '');
-      var dm = raw.match(/((?:nba|nhl|nfl|cfb|cbb|mlb|wnba|ufc|mls|epl)-[a-z0-9]+-[a-z0-9]+-\d{4}-\d{2}-\d{2})/i);
-      if (dm) es = dm[1];
-    }
-
-    if (!es) {
-      if (g.url && /polymarket\.(us|com)/i.test(String(g.url))) return g.url;
-      return 'https://polymarket.us';
-    }
-
-    var href = 'https://polymarket.us/event/' + es;
-
-    // Attach market slug as query so the event page can focus the line (when supported)
-    var ms = '';
-    if (isMarketShaped(g.marketSlug)) ms = String(g.marketSlug).replace(/^\/+/, '').split('?')[0];
-    else if (isMarketShaped(g.slug)) ms = String(g.slug).replace(/^\/+/, '').split('?')[0];
-    else if (g.marketUrl) {
-      var mm = String(g.marketUrl).match(/\/market\/([^/?#]+)/i);
-      if (mm && isMarketShaped(mm[1])) ms = mm[1];
-    }
-    if (ms) href += '?market=' + encodeURIComponent(ms);
-
-    return href;
+    if (pmOk(g.eventUrl)) return g.eventUrl;
+    if (g.eventSlug) return 'https://polymarket.us/event/' + encodeURIComponent(g.eventSlug);
+    if (pmOk(g.url)) return g.url;
+    if (pmOk(g.marketUrl)) return g.marketUrl;
+    if (g.marketSlug) return 'https://polymarket.us/market/' + encodeURIComponent(g.marketSlug);
+    return 'https://polymarket.us';
   }
+
 
   function gameGroupKey(g) {
     var v = String(g.venue || g.source || 'polymarket').toLowerCase();
@@ -8659,7 +8628,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: mode,
-          venue: g.venue || g.source || 'polymarket',
+          venue: String(g.venue || g.source || 'polymarket').toLowerCase(),
           pick: g.modelPick,
           title: g.eventTitle || g.title,
           slug: slug,
@@ -9525,6 +9494,107 @@
     }
   }
 
+  
+  function goodLedger() {
+    try { return JSON.parse(localStorage.getItem('bb_good_ledger') || '[]'); } catch (e) { return []; }
+  }
+  function saveGoodLedger(list) {
+    localStorage.setItem('bb_good_ledger', JSON.stringify((list || []).slice(0, 500)));
+  }
+  function goodKey(g) {
+    return 'good|' + String(g.id || g.marketSlug || '') + '|' + String(g.modelPick || '') + '|' + String(g.eventTitle || g.title || '');
+  }
+  function trackGoodPicks(list) {
+    var ledger = goodLedger();
+    var keys = {};
+    ledger.forEach(function (e) { keys[e.key] = true; });
+    var added = 0;
+    (list || []).forEach(function (g) {
+      var rk = String(g.rank || '').toLowerCase();
+      if (rk !== 'good') return;
+      var key = goodKey(g);
+      if (!key || keys[key]) return;
+      keys[key] = true;
+      var mt = String(g.marketType || 'moneyline').toLowerCase();
+      var pick = String(g.modelPick || '');
+      var entry = g.market_probability != null ? g.market_probability : g.impliedPct;
+      if (entry != null && entry > 1) entry = entry / 100;
+      ledger.unshift({
+        key: key,
+        id: g.id || null,
+        title: g.eventTitle || g.title,
+        pick: g.modelPick,
+        league: g.league,
+        venue: String(g.venue || g.source || 'polymarket').toLowerCase(),
+        marketType: mt,
+        marketBucket: (typeof coachMarketBucket === 'function') ? coachMarketBucket(mt, pick) : mt,
+        modelPct: g.model_probability,
+        spreadLine: g.spreadLine != null ? g.spreadLine : (g.line != null ? g.line : null),
+        marketPct: g.market_probability,
+        entryPrice: entry,
+        edgePp: g.edgePp != null ? g.edgePp : g.probability_edge,
+        rank: 'good',
+        result: 'open',
+        startTime: g.startTime || null,
+        totalLine: g.totalLine != null ? g.totalLine : g.line,
+        loggedAt: new Date().toISOString(),
+        priceAt: g.priceAt || g.fetchedAt || new Date().toISOString()
+      });
+      added++;
+    });
+    if (added) saveGoodLedger(ledger);
+    return added;
+  }
+  function paperStatsByVenue(list) {
+    var venues = { polymarket: emptyVenueStat(), kalshi: emptyVenueStat(), novig: emptyVenueStat(), other: emptyVenueStat() };
+    function emptyVenueStat() { return { n: 0, open: 0, won: 0, lost: 0, push: 0, hit: null, pnlU: 0 }; }
+    // re-init properly
+    venues = {
+      polymarket: { n: 0, open: 0, won: 0, lost: 0, push: 0, hit: null, pnlU: 0 },
+      kalshi: { n: 0, open: 0, won: 0, lost: 0, push: 0, hit: null, pnlU: 0 },
+      novig: { n: 0, open: 0, won: 0, lost: 0, push: 0, hit: null, pnlU: 0 },
+      other: { n: 0, open: 0, won: 0, lost: 0, push: 0, hit: null, pnlU: 0 }
+    };
+    (list || []).forEach(function (e) {
+      var v = String(e.venue || e.source || 'polymarket').toLowerCase();
+      if (v.indexOf('kalshi') >= 0) v = 'kalshi';
+      else if (v.indexOf('novig') >= 0) v = 'novig';
+      else if (v.indexOf('poly') >= 0) v = 'polymarket';
+      else if (!venues[v]) v = 'other';
+      var bucket = venues[v];
+      bucket.n++;
+      var r = eliteNormResult(e && e.result);
+      if (r === 'won') { bucket.won++; bucket.pnlU += 1; }
+      else if (r === 'lost') { bucket.lost++; bucket.pnlU -= 1; }
+      else if (r === 'push') bucket.push++;
+      else bucket.open++;
+    });
+    Object.keys(venues).forEach(function (k) {
+      var b = venues[k];
+      var risk = b.won + b.lost;
+      b.hit = risk > 0 ? Math.round((b.won / risk) * 1000) / 10 : null;
+      b.record = b.won + '-' + b.lost + (b.push ? ('-' + b.push) : '');
+    });
+    return venues;
+  }
+  function settleGood(key, result) {
+    var list = goodLedger();
+    list = list.map(function (e) {
+      if (e.key !== key) return e;
+      e.result = result;
+      e.settledAt = new Date().toISOString();
+      if (result === 'won') e.pnl = 1;
+      else if (result === 'lost') e.pnl = -1;
+      else if (result === 'push') e.pnl = 0;
+      else if (result === 'open') { e.pnl = null; e.settledAt = null; }
+      return e;
+    });
+    saveGoodLedger(list);
+    try { renderEliteReview(); } catch (e) {}
+    try { renderPaperVenueStats(); } catch (e2) {}
+  }
+
+
   function eliteLedger() {
     try { return JSON.parse(localStorage.getItem('bb_elite_ledger') || '[]'); } catch (e) { return []; }
   }
@@ -9731,6 +9801,55 @@
     }
     return list;
   }
+  
+  function renderPaperVenueStats() {
+    var eliteList = filteredEliteList();
+    var goodList = (goodLedger() || []).filter(function (e) {
+      return eliteInDay(e, eliteDayFilter || 'all');
+    });
+    var book = eliteBookFilter || 'all';
+    if (book === 'polymarket') {
+      goodList = goodList.filter(function (e) { return String(e.venue || '').indexOf('kalshi') < 0 && String(e.venue || '').indexOf('novig') < 0; });
+    } else if (book === 'kalshi') {
+      goodList = goodList.filter(function (e) { return String(e.venue || '').indexOf('kalshi') >= 0; });
+    } else if (book === 'novig') {
+      goodList = goodList.filter(function (e) { return String(e.venue || '').indexOf('novig') >= 0; });
+    }
+    var eBy = paperStatsByVenue(eliteList);
+    var gBy = paperStatsByVenue(goodList);
+    var gst = elitePaperStats(goodList) || {};
+    var gWon = Number(gst.won) || 0, gLost = Number(gst.lost) || 0, gOpen = Number(gst.open) || 0;
+    var gHit = gst.hit != null ? gst.hit + '%' : '—';
+    var host = $('paper-venue-stats');
+    if (!host) {
+      host = document.getElementById('paper-venue-stats');
+    }
+    if (!host) return;
+    function row(label, st) {
+      return '<div class="rounded-lg bg-black/30 border border-bb-border p-2 text-[11px]">' +
+        '<div class="text-bb-muted mb-1">' + label + '</div>' +
+        '<div class="text-white font-semibold">' + (st.record || (st.won + '-' + st.lost)) + '</div>' +
+        '<div class="text-bb-muted">Hit ' + (st.hit != null ? st.hit + '%' : '—') + ' · Open ' + st.open + ' · n ' + st.n + '</div></div>';
+    }
+    host.innerHTML =
+      '<div class="mb-2 text-[11px] text-bb-muted font-semibold uppercase tracking-wide">Elite paper by venue</div>' +
+      '<div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">' +
+        row('Polymarket Elite', eBy.polymarket) +
+        row('Kalshi Elite', eBy.kalshi) +
+        row('Novig Elite', eBy.novig) +
+        row('Elite total', { record: (Number(($('elite-week-record')||{}).textContent||'0-0')), won: eBy.polymarket.won+eBy.kalshi.won+eBy.novig.won, lost: eBy.polymarket.lost+eBy.kalshi.lost+eBy.novig.lost, hit: null, open: eBy.polymarket.open+eBy.kalshi.open+eBy.novig.open, n: eBy.polymarket.n+eBy.kalshi.n+eBy.novig.n }) +
+      '</div>' +
+      '<div class="mb-2 text-[11px] text-bb-muted font-semibold uppercase tracking-wide">Good paper by venue (W-L)</div>' +
+      '<div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">' +
+        row('Polymarket Good', gBy.polymarket) +
+        row('Kalshi Good', gBy.kalshi) +
+        row('Novig Good', gBy.novig) +
+        row('Good total ' + gWon + '-' + gLost, { record: gWon + '-' + gLost, won: gWon, lost: gLost, hit: gst.hit, open: gOpen, n: goodList.length }) +
+      '</div>' +
+      '<p class="text-[10px] text-bb-muted m-0">ESPN settle grades <b>ML + Over/Under</b> (and NRFI/F5 when applicable) for open Elite + Good paper across all venues. Spreads stay manual.</p>';
+  }
+
+
   function renderEliteReview() {
     var book = eliteBookFilter || 'all';
     var day = eliteDayFilter || 'all';
@@ -9771,6 +9890,7 @@
     }
     if ($('elite-week-roi')) {
       $('elite-week-roi').textContent = roiN != null ? ((roiN >= 0 ? '+' : '') + roiN + '%') : '—';
+    try { renderPaperVenueStats(); } catch (eVs) {}
       $('elite-week-roi').className = 'text-lg font-semibold ' + (roiN != null && roiN > 0 ? 'text-bb-green' : roiN != null && roiN < 0 ? 'text-bb-red' : 'text-white');
     }
     // toggle button styles
@@ -9942,16 +10062,18 @@
     var t = String(mt || '').toLowerCase();
     var p = String(pick || '').toLowerCase();
     var lg = String(league || '').toLowerCase();
-    // Esports series/match winner (not map markets)
     if (isEsportsLeagueClient(lg)) {
       if (/map_|map\s*[123]|spread|total|handicap/.test(t + ' ' + p)) return false;
-      return true; // match winner / moneyline
+      return true;
     }
-    // MLB NRFI/YRFI + F5: auto via MLB linescore
     if (/nrfi|yrfi/.test(t) || /\bnrfi\b|\byrfi\b|no run first|yes run first/.test(p)) return true;
     if (/f5/.test(t) || /\bf5\b|first\s*5|first five/.test(p)) return true;
-    // Spreads / props / other innings: manual
-    if (/spread|prop|inning|player_/.test(t)) return false;
+    // Player props — ESPN boxscore when available
+    if (/player_|prop|pitcher_/.test(t)) return true;
+    if (/\d+\+|over\s+\d+|under\s+\d+/.test(p) && /pts|points|reb|ast|pra|yard|reception|strikeout|hits|hr|goal|shot/.test(p + t)) return true;
+    // Full-game spreads (period spreads grade when period linescores exist; else stay open)
+    if (/spread|handicap|ats/.test(t)) return true;
+    if (/[+-]\d+(?:\.\d+)?/.test(p) && !/over|under/.test(p)) return true;
     if (!t || t === 'all' || /moneyline|^ml$|winner/.test(t)) return true;
     if (/total|totals/.test(t)) return true;
     if (/\bover\b|\bunder\b|o\/u/.test(p)) return true;
@@ -9961,10 +10083,13 @@
   async function settleMlFromEspn(opts) {
     opts = opts || {};
     var elite = eliteLedger().filter(function (e) {
-      return e.result === 'open' && isAutoSettleableBet(e.marketType, e.pick, e.league);
+      return eliteNormResult(e.result) === 'open' && isAutoSettleableBet(e.marketType, e.pick, e.league);
+    });
+    var good = (typeof goodLedger === 'function' ? goodLedger() : []).filter(function (e) {
+      return eliteNormResult(e.result) === 'open' && isAutoSettleableBet(e.marketType, e.pick, e.league);
     });
     var journal = journalBets().filter(function (b) {
-      return b.result === 'open' && isAutoSettleableBet(b.marketType, b.pick, b.league);
+      return eliteNormResult(b.result) === 'open' && isAutoSettleableBet(b.marketType, b.pick, b.league);
     });
     var picks = [];
     elite.forEach(function (e) {
@@ -9975,9 +10100,26 @@
         pick: e.pick,
         marketType: e.marketType || 'moneyline',
         totalLine: e.totalLine != null ? e.totalLine : null,
+        spreadLine: e.spreadLine != null ? e.spreadLine : (e.line != null ? e.line : null),
         source: 'elite',
+        venue: e.venue || 'polymarket',
         startTime: e.startTime || null,
-        loggedAt: e.at || null
+        loggedAt: e.loggedAt || e.at || null
+      });
+    });
+    good.forEach(function (e) {
+      picks.push({
+        key: 'good:' + e.key,
+        league: e.league || 'mlb',
+        title: e.title,
+        pick: e.pick,
+        marketType: e.marketType || 'moneyline',
+        totalLine: e.totalLine != null ? e.totalLine : null,
+        spreadLine: e.spreadLine != null ? e.spreadLine : (e.line != null ? e.line : null),
+        source: 'good',
+        venue: e.venue || 'polymarket',
+        startTime: e.startTime || null,
+        loggedAt: e.loggedAt || e.at || null
       });
     });
     journal.forEach(function (b) {
@@ -9989,6 +10131,7 @@
         marketType: b.marketType || 'moneyline',
         totalLine: b.totalLine != null ? b.totalLine : null,
         source: 'journal',
+        venue: b.venue || 'polymarket',
         id: b.id,
         startTime: b.startTime || null,
         loggedAt: b.at || null
@@ -10006,7 +10149,7 @@
       if (!opts.quiet) alert('No settleable open picks.\n\n' + futureN + ' open games have not started yet (stay Open on purpose).\nML + full-game O/U + MLB NRFI/YRFI + F5 can auto-settle after the relevant innings finish.');
       return;
     }
-    if (!opts.quiet && !confirm('Settle up to ' + Math.min(40, picks.length) + ' open ML / O/U / NRFI / F5 picks?\n\n' + (futureN ? (futureN + ' future games skipped (not started).\n') : '') + '(Spreads / props stay manual. NRFI/F5 use MLB linescore.)')) return;
+    if (!opts.quiet && !confirm('Settle up to ' + Math.min(40, picks.length) + ' open ML / O/U / NRFI / F5 picks?\n\n' + (futureN ? (futureN + ' future games skipped (not started).\n') : '') + '(Full-game spreads + player props + ML + O/U auto. Period markets stay open if no period score. NRFI/F5 use MLB linescore.)')) return;
     try {
       var stSettle = settings();
       var r = await fetch('/api/settle-ml', {
@@ -10039,6 +10182,22 @@
         return e;
       });
       saveEliteLedger(eList);
+
+      var gList = (typeof goodLedger === 'function') ? goodLedger() : [];
+      gList = gList.map(function (e) {
+        var x = byKey['good:' + e.key];
+        if (!x || !x.completed || !x.outcome) return e;
+        e.result = x.outcome;
+        e.settledAt = new Date().toISOString();
+        e.settleSource = 'espn';
+        e.finalScore = x.score || null;
+        if (x.settleDetail) {
+          e.settleDetail = x.settleDetail;
+          e.settleReason = x.settleDetail.reason || null;
+        }
+        return e;
+      });
+      if (typeof saveGoodLedger === 'function') saveGoodLedger(gList);
 
       var jList = journalBets();
       var settledRows = [];
@@ -10526,6 +10685,27 @@
     return 'good';
   }
 
+  
+  function stampFreshPrices(list) {
+    var now = new Date().toISOString();
+    (list || []).forEach(function (g) {
+      g.fetchedAt = now;
+      g.priceAt = now;
+      // Prefer live yesPrice → market_probability for board
+      var yp = g.yesPrice;
+      if (yp != null) {
+        var p = Number(yp);
+        if (Number.isFinite(p)) {
+          if (p > 1.5) p = p / 100;
+          if (p > 0 && p < 1.5) {
+            g.market_probability = Math.round(p * 1000) / 10;
+          }
+        }
+      }
+    });
+    return list;
+  }
+
   function filterGamesClient(list) {
     list = list || [];
     // Drop completed Finals + expired / resolved junk
@@ -10546,9 +10726,8 @@
       var mkt = g.market_probability != null ? Number(g.market_probability) : null;
       if (mkt != null) {
         if (mkt > 1) mkt = mkt / 100;
-        // Locked post-result prices — hide unless truly live
-        if ((mkt >= 0.97 || mkt <= 0.03) && !g.live) return false;
-        if (mkt >= 0.97 || mkt <= 0.03) return false;
+        // Only hide locked post-result prices (near 0/1) when NOT live
+        if ((mkt >= 0.98 || mkt <= 0.02) && !g.live) return false;
       }
       var mt = String(g.marketType || '').toLowerCase();
       var pick = String(g.modelPick || '').toLowerCase();
@@ -10607,7 +10786,8 @@
     }
     // Day filter: Next 3 days (default) / Today / Tomorrow / All
     var df = typeof dayFilter !== 'undefined' ? dayFilter : 'next3';
-    if (df && df !== 'all') {
+    if (typeof isQcMode === 'function' && isQcMode()) { /* QC: skip day window */ }
+    else if (df && df !== 'all') {
       var nowD = new Date();
       function dayKeyFromDate(d) {
         return d.getFullYear() + '-' + (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() < 10 ? '0' : '') + d.getDate();
@@ -10708,8 +10888,16 @@
 
   function resolveSportLeague(sp) {
     var s = String(sp || '').toLowerCase();
+    if (!s || s === 'all') return 'all';
     if (s === 'mls' || s === 'epl' || s === 'lal' || s === 'bun' || s === 'sea' || s === 'ucl' || s === 'uefa' || s === 'fwc' || s === 'football') return 'soccer';
+    if (s === 'esport' || s === 'e-sports') return 'esports';
     return s;
+  }
+  /** League param for every venue — keeps All sports consistent */
+  function scanLeagueParam() {
+    var sp = (typeof sport !== 'undefined' && sport) ? sport : 'all';
+    if (!sp || sp === 'all') return 'all';
+    return resolveSportLeague(sp);
   }
 
   function getPandascoreToken() {
@@ -10725,7 +10913,7 @@
   }
 
   function polyQuery(mt, rankF, minEv, minEdge, minSc, strict, allowMkt, leagueOverride) {
-    var q = '/api/games?mode=' + encodeURIComponent(apiMode()) +
+    var q = '/api/games?_t=' + Date.now() + '&mode=' + encodeURIComponent(apiMode()) +
       '&marketType=' + encodeURIComponent(mt || 'all') +
       '&minEdge=' + encodeURIComponent(minEdge || '0') +
       '&minScore=' + encodeURIComponent(minSc || '0') +
@@ -10750,7 +10938,7 @@
         return '0';
       })();
     // Rank filter applied client-side too — still pass for server summary
-    if (rankF) q += '&rank=' + encodeURIComponent(rankF);
+    q += '&rank=' + encodeURIComponent((typeof isQcMode === 'function' && isQcMode()) ? 'all' : (rankF || 'all'));
     if (Number(minEv) > 0) q += '&minGoodEv=' + encodeURIComponent(minEv);
     if (Number(minEdge) > 0) q += '&minGoodEdge=' + encodeURIComponent(minEdge);
     var lg = leagueOverride != null ? leagueOverride : sport;
@@ -10833,11 +11021,12 @@
   
   function novigQuery(mt, rankF) {
     var st = settings();
+    var _novigTs = Date.now();
     var keyId = (st.novigKeyId || ($('novig-key-id') && $('novig-key-id').value) || '').trim();
     var pem = (st.novigPem || ($('novig-pem') && $('novig-pem').value) || '').trim();
     var env = (st.novigEnv || ($('novig-env') && $('novig-env').value) || 'paper').trim();
-    var lim = 40;
-    var q = '/api/venues?v=novig&league=' + encodeURIComponent(sport && sport !== 'all' ? resolveSportLeague(sport) : 'all') +
+    var lim = (sport === 'all') ? 80 : 140;
+    var q = '/api/venues?v=novig&_t=' + _novigTs + '&mode=' + encodeURIComponent(apiMode()) + '&league=' + encodeURIComponent(scanLeagueParam()) +
       '&marketType=' + encodeURIComponent(mt || 'all') +
       '&rank=' + encodeURIComponent(rankF || 'all') +
       '&env=' + encodeURIComponent(env);
@@ -10849,10 +11038,11 @@
   }
 
 function kalQuery(mt, strict, allowMkt) {
-    var lim = (sport === 'all' || mt === 'all') ? 60 : 35;
-    var kq = '/api/venues?v=kalshi&mode=' + encodeURIComponent(apiMode()) +
-      '&league=' + encodeURIComponent(sport && sport !== 'all' ? resolveSportLeague(sport) : 'all') +
+    var lim = (sport === 'all') ? 60 : (mt === 'all' ? 100 : 80);
+    var kq = '/api/venues?v=kalshi&_t=' + Date.now() + '&mode=' + encodeURIComponent(apiMode()) +
+      '&league=' + encodeURIComponent(scanLeagueParam()) +
       '&marketType=' + encodeURIComponent(mt || 'all') +
+      '&rank=all' +
       '&strict=' + encodeURIComponent(strict) +
       '&allowMarketGood=' + allowMkt +
       '&allowThinFormGood=' + (($('allow-thin-form-good') && !$('allow-thin-form-good').checked) ? '0' : '1') +
@@ -10915,11 +11105,18 @@ function kalQuery(mt, strict, allowMkt) {
     }
   });
   document.addEventListener('change', function (ev) {
-    if (ev.target && (ev.target.id === 'dash-sport' || ev.target.id === 'dash-market')) {
+    if (ev.target && (ev.target.id === 'dash-sport' || ev.target.id === 'dash-market' || ev.target.id === 'dash-rank')) {
       var sports = selectedDashValues('dash-sport');
-      sport = (!sports.length || sports.indexOf('all') >= 0) ? 'all' : (sports.length === 1 ? sports[0] : 'all');
+      // Multi-select: one sport → that sport; multiple without all → still query all then client-filter
+      if (!sports.length || sports.indexOf('all') >= 0) sport = 'all';
+      else if (sports.length === 1) sport = sports[0];
+      else sport = 'all'; // API all, boardSportFilter keeps selected
       var mk = selectedDashValues('dash-market');
       marketType = (!mk.length || mk.indexOf('all') >= 0) ? 'all' : (mk.length === 1 ? mk[0] : 'all');
+      try {
+        if ($('m-sport')) $('m-sport').value = sport;
+        if ($('sc-sport')) $('sc-sport').value = sport;
+      } catch (eSp) {}
       if ($('sc-market')) try { $('sc-market').value = marketType; } catch (eM) {}
       if ($('market-select')) try { $('market-select').value = marketType; } catch (eM2) {}
       if (typeof loadGames === 'function') loadGames();
@@ -11086,7 +11283,9 @@ function kalQuery(mt, strict, allowMkt) {
     if (/potd|super/.test(r)) cls = 'potd';
     else if (/elite/.test(r)) cls = 'elite';
     else if (/good/.test(r)) cls = 'good';
-    return '<span class="eo-rank-pill ' + cls + '">' + escapeHtml(label) + '</span>';
+    var fb = formBadge(g);
+    return '<span class="eo-rank-pill ' + cls + '">' + escapeHtml(label) + '</span>' +
+      ' <span class="' + fb.cls + '" title="' + escapeHtml((g && g.formNote) || fb.text) + '">' + fb.text + '</span>';
   }
 
   function boardVenueTag(g) {
@@ -11214,7 +11413,25 @@ function renderBoardTable(list) {
       });
       var clock = '';
       try { clock = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET · '; } catch (eC) {}
-      meta.textContent = clock + list.length + ' MARKETS';
+      (function () {
+        var age = '';
+        try {
+          var freshest = null;
+          (list || []).forEach(function (g) {
+            var t = g.priceAt || g.fetchedAt;
+            if (!t) return;
+            var ms = new Date(t).getTime();
+            if (Number.isFinite(ms) && (freshest == null || ms > freshest)) freshest = ms;
+          });
+          if (freshest != null) {
+            var sec = Math.round((Date.now() - freshest) / 1000);
+            if (sec < 5) age = ' · prices just now';
+            else if (sec < 120) age = ' · prices ' + sec + 's ago';
+            else age = ' · prices ' + Math.round(sec / 60) + 'm ago';
+          } else age = ' · live prices';
+        } catch (eA) { age = ' · live prices'; }
+        meta.textContent = clock + list.length + ' MARKETS' + age;
+      })();
       if ($('dash-mkt-count')) $('dash-mkt-count').textContent = String(list.length);
     }
     // re-select
@@ -11439,7 +11656,7 @@ function renderBoardTable(list) {
           sport = sportKeep;
         }
         var list = (data && data.games) ? data.games : [];
-        list = filterGamesClient(dedupeGameCards(list));
+        list = stampFreshPrices(filterGamesClient(dedupeGameCards(list)));
         list.forEach(function (g) {
           g.venue = ven;
           g.source = ven;
@@ -11470,7 +11687,7 @@ function renderBoardTable(list) {
           }
         }
       }
-      var added = trackElitePicks(allFound);
+      var added = trackElitePicks(allFound); try { trackGoodPicks(allFound); } catch (eG2) {}
       try { maybeAutoDiscordElite(allFound); } catch (eD) {}
       try { updateWeeklyReport(); renderEliteReview(); } catch (eW) {}
       // optional: feed auto on elites only
@@ -11606,8 +11823,8 @@ async function loadGames() {
         var settled = await Promise.allSettled([polyPromise, kalPromise]);
         var polyRaw = settled[0].status === 'fulfilled' ? settled[0].value : { ok: false, games: [], error: 'poly failed' };
         var kalRaw = settled[1].status === 'fulfilled' ? settled[1].value : { ok: false, games: [], error: 'kalshi failed' };
-        var polyG = filterGamesClient(dedupeGameCards((polyRaw && polyRaw.games) ? polyRaw.games : []));
-        var kalG = filterGamesClient(dedupeGameCards((kalRaw && kalRaw.games) ? kalRaw.games : []));
+        var polyG = stampFreshPrices(filterGamesClient(dedupeGameCards((polyRaw && polyRaw.games) ? polyRaw.games : [])));
+        var kalG = stampFreshPrices(filterGamesClient(dedupeGameCards((kalRaw && kalRaw.games) ? kalRaw.games : [])));
         polyG.forEach(function (g) { g.venue = 'polymarket'; g.source = 'polymarket'; });
         kalG.forEach(function (g) { g.venue = 'kalshi'; g.source = 'kalshi'; });
         games = polyG.concat(kalG);
@@ -11646,8 +11863,8 @@ async function loadGames() {
           var settled2 = await Promise.allSettled([polyPromise2, kalPromise2]);
           var polyRaw2 = settled2[0].status === 'fulfilled' ? settled2[0].value : { games: [] };
           var kalRaw2 = settled2[1].status === 'fulfilled' ? settled2[1].value : { games: [] };
-          var polyG2 = filterGamesClient(dedupeGameCards((polyRaw2 && polyRaw2.games) ? polyRaw2.games : []));
-          var kalG2 = filterGamesClient(dedupeGameCards((kalRaw2 && kalRaw2.games) ? kalRaw2.games : []));
+          var polyG2 = stampFreshPrices(filterGamesClient(dedupeGameCards((polyRaw2 && polyRaw2.games) ? polyRaw2.games : [])));
+          var kalG2 = stampFreshPrices(filterGamesClient(dedupeGameCards((kalRaw2 && kalRaw2.games) ? kalRaw2.games : [])));
           polyG2.forEach(function (g) { g.venue = 'polymarket'; g.source = 'polymarket'; });
           kalG2.forEach(function (g) { g.venue = 'kalshi'; g.source = 'kalshi'; });
           list = polyG2.concat(kalG2);
@@ -11686,7 +11903,7 @@ async function loadGames() {
             if (boxP) boxP.innerHTML = '';
             if (boxK) boxK.innerHTML = '';
           } else {
-            games = filterGamesClient(dedupeGameCards(list));
+            games = stampFreshPrices(filterGamesClient(dedupeGameCards(list)));
             // If rank/day filters wiped Novig but catalog had rows, show catalog rows (Pass ok)
             if (!games.length && list.length) {
               games = dedupeGameCards(list).filter(function (g) { return !g.ended; }).slice(0, 60);
@@ -11724,7 +11941,7 @@ async function loadGames() {
           take(settledC[0], 'polymarket');
           take(settledC[1], 'kalshi');
           take(settledC[2], 'novig');
-          games = filterGamesClient(dedupeGameCards(parts));
+          games = stampFreshPrices(filterGamesClient(dedupeGameCards(parts)));
           if (!games.length && parts.length) {
             games = dedupeGameCards(parts).filter(function (g) { return !g.ended; }).slice(0, 100);
           }
@@ -11747,7 +11964,7 @@ async function loadGames() {
             if (boxP) boxP.innerHTML = '';
             if (boxK) boxK.innerHTML = '';
           } else {
-          games = filterGamesClient(dedupeGameCards(list));
+          games = stampFreshPrices(filterGamesClient(dedupeGameCards(list)));
           games.forEach(function (g) { g.venue = 'kalshi'; g.source = 'kalshi'; });
           renderGameList(box, games);
           if (boxP) boxP.innerHTML = '';
@@ -11767,7 +11984,7 @@ async function loadGames() {
           } // end kalshi else has-games
         } else if (sport === 'all') {
           list = await fetchPolyAllLeagues(mt, rankF, minEv, minEdge, minSc, strict, allowMkt);
-          games = filterGamesClient(dedupeGameCards(list));
+          games = stampFreshPrices(filterGamesClient(dedupeGameCards(list)));
           games.forEach(function (g) { g.venue = g.venue || 'polymarket'; g.source = g.source || 'polymarket'; });
           renderGameList(box, games);
           if (boxP) boxP.innerHTML = '';
@@ -11788,7 +12005,7 @@ async function loadGames() {
           var data = await fetchJsonTimeout(polyQuery(mt, rankF, minEv, minEdge, minSc, strict, allowMkt), tMs2);
           if (!data.ok && !(data.games && data.games.length)) throw new Error(data.error || 'Polymarket failed');
           list = data.games || [];
-          games = filterGamesClient(dedupeGameCards(list));
+          games = stampFreshPrices(filterGamesClient(dedupeGameCards(list)));
           if (!games.length && list.length) {
             games = dedupeGameCards(list).filter(function (g) { return !g.ended; }).slice(0, 100);
           }
@@ -11812,7 +12029,7 @@ async function loadGames() {
         }
       }
       renderSlate();
-      trackElitePicks(games);
+      trackElitePicks(games); try { trackGoodPicks(games); } catch (eG) {}
       maybeAutoDiscordElite(games);
       try {
         var _stA = settings();
@@ -11842,7 +12059,7 @@ async function loadGames() {
     var sent = {};
     try { sent = JSON.parse(localStorage.getItem('bb_elite_sent') || '{}'); } catch (e) {}
     var queue = [];
-    trackElitePicks(list);
+    trackElitePicks(list); try { trackGoodPicks(list); } catch (eG3) {}
     (list || []).forEach(function (g) {
       if (String(g.rank).toLowerCase() !== 'elite') return;
       var key = String(g.id || g.eventTitle || g.title || '');
